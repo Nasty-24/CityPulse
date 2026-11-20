@@ -282,11 +282,16 @@ async def city(
     country: str | None = Query(None, pattern="^[A-Za-z]{2}$",
                                 description="ISO 3166-1 alpha-2 code to pick the right city, e.g. FR or US"),
 ):
+    return await snapshot(name, country.upper() if country else None, check_src(src))
+
+def check_src(src):
     want = src or list(S)
     bad = [s for s in want if s not in S]
     if bad:
         raise HTTPException(400, f"unknown src: {bad}")
-    cc = country.upper() if country else None
+    return want
+
+async def snapshot(name, cc, want):
     gk = f"geo:{name.lower()}" + (f":{cc}" if cc else "")
     g, _ = await cached(gk, 30 * 86400, lambda: geo(name, cc))
 
@@ -302,3 +307,36 @@ async def city(
     res = dict(await asyncio.gather(*(one(s) for s in want)))
     return {"city": {k: g.get(k) for k in ("name", "country", "latitude", "longitude")},
             "pulse": pulse_score(res), "res": res}
+
+@app.get("/compare")
+async def compare(
+    city: list[str] = Query(..., description='Repeat 2 to 5 times. Add a country code after a comma to pick the right one, e.g. "Paris,US".'),
+    src: list[str] = Query(None, description=f"Repeatable. Any of: {', '.join(S)}. Omit for all."),
+):
+    if not 2 <= len(city) <= 5:
+        raise HTTPException(400, "compare needs between 2 and 5 cities")
+    want = check_src(src)
+    specs = []
+    for c in city:
+        name, _, cc = c.partition(",")
+        name, cc = name.strip(), cc.strip().upper() or None
+        if not name or (cc and not (len(cc) == 2 and cc.isalpha())):
+            raise HTTPException(400, f'bad city "{c}": use a name, optionally followed by ",XX" country code')
+        specs.append((name, cc))
+
+    async def one(name, cc):
+        try:
+            return await snapshot(name, cc, want)
+        except HTTPException as e:
+            return {"query": f"{name},{cc}" if cc else name, "err": e.detail}
+        except httpx.HTTPError as e:
+            return {"query": name, "err": f"lookup failed: {type(e).__name__}"}
+
+    out = await asyncio.gather(*(one(n, cc) for n, cc in specs))
+    found = [o for o in out if "city" in o]
+    ranking = sorted(
+        ({"name": o["city"]["name"], "country": o["city"]["country"], "score": o["pulse"]["score"]}
+         for o in found if o["pulse"]),
+        key=lambda r: -r["score"],
+    )
+    return {"cities": out, "ranking": ranking}

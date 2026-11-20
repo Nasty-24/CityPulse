@@ -110,6 +110,27 @@ form.search { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.5rem 0 0; }
 .reading ul { margin: .35rem 0 0; padding-left: 1.1rem; font-size: .95rem; }
 .stale { color: var(--fair); font-size: .85rem; }
 
+/* compare */
+form.vs { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: 1.5rem 0 0; }
+form.vs label { color: var(--muted); }
+form.vs input { font: inherit; color: var(--ink); background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: .45rem .7rem; flex: 0 1 14rem; min-width: 0; }
+form.vs button { font: 600 .95rem var(--body); color: var(--ink); background: none; border: 1.5px solid var(--ink); border-radius: 6px; padding: .45rem .9rem; cursor: pointer; }
+.cmp-head { padding: 2.5rem 0 1rem; }
+.cmp-head h1 { font: 800 clamp(2.2rem, 7vw, 4.5rem)/1 var(--display); letter-spacing: -0.03em; margin: 0; }
+.cmp-head p { color: var(--muted); margin: .6rem 0 0; }
+.table-scroll { overflow-x: auto; margin: 1rem 0 3rem; }
+table.cmp { border-collapse: collapse; width: 100%; min-width: 34rem; font-variant-numeric: tabular-nums; }
+.cmp th, .cmp td { text-align: left; padding: .8rem 1rem .8rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.cmp thead th { border-bottom: 2px solid var(--ink); font: 800 1.5rem/1.1 var(--display); letter-spacing: -0.02em; }
+.cmp thead th span { display: block; font: 400 .9rem var(--body); color: var(--muted); letter-spacing: 0; }
+.cmp tbody th { color: var(--muted); font-weight: 400; width: 11rem; }
+.cmp td { font: 600 1.25rem var(--display); }
+.cmp td small { font: 400 .85rem var(--body); color: var(--muted); }
+.cmp td.best { color: var(--good); }
+.cmp td.best::after { content: " best"; font: 600 .75rem var(--body); vertical-align: .2rem; }
+.cmp .rank td, .cmp .rank th { border-bottom: 2px solid var(--ink); }
+.cmp-errors { color: var(--poor); }
+
 /* states */
 .empty { padding: 3rem 0 4rem; max-width: 36rem; }
 .empty h1 { font: 800 clamp(2.5rem, 8vw, 4.5rem)/1 var(--display); letter-spacing: -0.03em; margin: 0 0 1rem; }
@@ -241,6 +262,11 @@ function render(j) {
       </div>
       ${pulseSVG(intensities(r))}
       <p class="summary">${summary}</p>
+      <form class="vs" id="vs">
+        <label for="vs-city">Compare ${esc(c.name)} with</label>
+        <input id="vs-city" placeholder="Another city, e.g. Kampala" required>
+        <button type="submit">Compare</button>
+      </form>
     </section>
     <section class="groups">
       <div class="group"><h2>Right now</h2>${now.join("")}</div>
@@ -248,6 +274,74 @@ function render(j) {
       <div class="group"><h2>People and money</h2>${people.join("")}</div>
     </section>`;
   document.title = `${c.name} – CityPulse`;
+  const here = $("#country").value.trim();
+  $("#vs").addEventListener("submit", e => {
+    e.preventDefault();
+    const other = $("#vs-city").value.trim();
+    go({ compare: [here ? `${$("#city").value.trim()},${here}` : $("#city").value.trim(), other] });
+  });
+}
+
+// rows for the compare table: label, value getter, display, which direction is better
+const ROWS = [
+  ["Air quality (AQI)", r => r.air?.data?.us_aqi, (v, r) => `${fmt(v, 0)} <small>${esc(r.air.data.aqi_category)}</small>`, "low"],
+  ["Temperature", r => r.weather?.data?.temperature_2m, (v, r) => `${fmt(v)}°C <small>${esc(r.weather.data.weather)}</small>`, null],
+  ["Strongest quake nearby, 30 days", r => r.quakes?.data ? (r.quakes.data.max ?? 0) : undefined, (v, r) => r.quakes.data.n ? `M${fmt(v)} <small>${r.quakes.data.n} quakes</small>` : "None", "low"],
+  ["Active natural events", r => r.disasters?.data?.n, v => fmt(v, 0), "low"],
+  ["Homicides per 100k", r => r.crime?.data?.homicide_100k?.v, (v, r) => `${fmt(v)} <small>${esc(r.crime.data.homicide_100k.yr)}</small>`, "low"],
+  ["DTP3 vaccination", r => r.vaccines?.data?.dtp3?.v, v => `${fmt(v, 0)}%`, "high"],
+  ["Currency per USD", r => r.fx?.data?.per_usd, (v, r) => `${fmt(v, 2)} <small>${esc(r.fx.data.cur)}</small>`, null],
+];
+
+function renderCompare(j) {
+  const ok = j.cities.filter(c => c.city), bad = j.cities.filter(c => !c.city);
+  if (ok.length < 2) throw new Error(bad.map(b => `${b.query}: ${b.err}`).join(". ") || "Not enough cities found to compare.");
+  const top = j.ranking[0];
+  const cell = (cls, html) => `<td class="${cls}">${html}</td>`;
+  const scores = ok.map(c => c.pulse?.score);
+  const bestScore = Math.max(...scores.filter(s => s != null));
+  const body = ROWS.map(([label, get, show, dir]) => {
+    const vals = ok.map(c => get(c.res));
+    const known = vals.filter(v => v != null);
+    const best = dir && known.length > 1 && new Set(known).size > 1 ? (dir === "low" ? Math.min(...known) : Math.max(...known)) : null;
+    return `<tr><th scope="row">${label}</th>${vals.map((v, i) => v == null ? cell("", "–") : cell(v === best ? "best" : "", show(v, ok[i].res))).join("")}</tr>`;
+  }).join("");
+  $("#out").innerHTML = `
+    <section class="cmp-head">
+      <h1>${ok.map(c => esc(c.city.name)).join(" vs ")}</h1>
+      <p>${top ? `${esc(top.name)} has the highest pulse score at ${top.score}.` : ""} Green marks the better value in each row.</p>
+      ${bad.length ? `<p class="cmp-errors">Left out: ${bad.map(b => `${esc(b.query)} (${esc(b.err)})`).join(", ")}.</p>` : ""}
+    </section>
+    <div class="table-scroll"><table class="cmp">
+      <thead><tr><td></td>${ok.map(c => `<th scope="col">${esc(c.city.name)}<span>${esc(c.city.country)}</span></th>`).join("")}</tr></thead>
+      <tbody>
+        <tr class="rank"><th scope="row">Pulse score</th>${ok.map(c => c.pulse ? cell(c.pulse.score === bestScore && ok.length > 1 ? "best" : "", `${c.pulse.score} <small>${esc(c.pulse.grade)}</small>`) : cell("", "–")).join("")}</tr>
+        ${body}
+      </tbody>
+    </table></div>`;
+  document.title = `${ok.map(c => c.city.name).join(" vs ")} – CityPulse`;
+}
+
+function go(state) {
+  const u = new URL(location.pathname, location.origin);
+  if (state.compare) state.compare.forEach(c => u.searchParams.append("compare", c));
+  else { u.searchParams.set("city", state.city); if (state.cc) u.searchParams.set("country", state.cc); }
+  history.pushState(null, "", u);
+  route();
+}
+
+async function compareCities(list) {
+  const btn = $("#go");
+  btn.disabled = true;
+  $("#out").innerHTML = `<section class="cmp-head"><h1>Comparing ${list.map(esc).join(" and ")}…</h1></section>`;
+  try {
+    const res = await fetch(`/compare?${list.map(c => "city=" + encodeURIComponent(c)).join("&")}`);
+    const j = await res.json();
+    if (!res.ok) throw new Error(typeof j.detail === "string" ? j.detail : "Request failed");
+    renderCompare(j);
+  } catch (e) {
+    $("#out").innerHTML = `<section class="empty"><p class="error">${esc(e.message)}</p></section>`;
+  } finally { btn.disabled = false; }
 }
 
 async function check(city, cc) {
@@ -260,8 +354,6 @@ async function check(city, cc) {
     const j = await res.json();
     if (!res.ok) throw new Error(typeof j.detail === "string" ? j.detail : res.status === 422 ? "Country must be a two-letter code, like FR or US." : (j.err || "Request failed"));
     render(j);
-    const u = new URL(location); u.searchParams.set("city", city); cc ? u.searchParams.set("country", cc) : u.searchParams.delete("country");
-    history.replaceState(null, "", u);
   } catch (e) {
     const msg = /not found/i.test(e.message) ? `No city called “${esc(city)}”${cc ? ` in ${esc(cc.toUpperCase())}` : ""}. Check the spelling${cc ? " or remove the country code" : ""}.` : esc(e.message);
     $("#out").innerHTML = `<section class="empty"><p class="error">${msg}</p></section>`;
@@ -273,14 +365,22 @@ async function check(city, cc) {
 
 $("#search").addEventListener("submit", e => {
   e.preventDefault();
-  check($("#city").value.trim(), $("#country").value.trim());
+  go({ city: $("#city").value.trim(), cc: $("#country").value.trim() });
 });
 document.querySelectorAll(".hint button").forEach(b => b.addEventListener("click", () => {
   $("#city").value = b.dataset.c; $("#country").value = b.dataset.cc || "";
-  check(b.dataset.c, b.dataset.cc || "");
+  go({ city: b.dataset.c, cc: b.dataset.cc || "" });
 }));
-const p = new URLSearchParams(location.search);
-if (p.get("city")) { $("#city").value = p.get("city"); $("#country").value = p.get("country") || ""; check(p.get("city"), p.get("country") || ""); }
+
+// the URL is the state: ?city=X[&country=YY] or ?compare=A&compare=B
+function route() {
+  const p = new URLSearchParams(location.search);
+  const cmp = p.getAll("compare");
+  if (cmp.length) return compareCities(cmp);
+  if (p.get("city")) { $("#city").value = p.get("city"); $("#country").value = p.get("country") || ""; return check(p.get("city"), p.get("country") || ""); }
+}
+window.addEventListener("popstate", route);
+route();
 </script>
 </body>
 </html>

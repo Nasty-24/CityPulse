@@ -27,6 +27,7 @@ Public data APIs are scattered, inconsistent, and flaky. CityPulse fans out to t
 - Zero API keys
 - Web dashboard at `/`: search a city and see every reading, with a pulse line that spikes on notable values
 - Pulse score: one 0 to 100 number per city, with a per-reading breakdown
+- Compare 2 to 5 cities side by side with `/compare`, ranked by pulse score
 - Auto generated docs at `/docs` (Swagger) and `/redoc`
 
 ## Quick start
@@ -69,6 +70,22 @@ Errors:
 | 502  | Geocoding upstream failed (see body for why) |
 
 Per source failures do not fail the request. They appear inside `res`.
+
+### `GET /compare`
+
+```
+GET /compare?city=Nairobi&city=Kampala
+GET /compare?city=Paris,US&city=Paris,FR&src=air&src=weather
+```
+
+| Param  | In    | Required | Description                                                         |
+|--------|-------|----------|---------------------------------------------------------------------|
+| `city` | query | yes      | Repeat 2 to 5 times. Add `,XX` for a country code, e.g. `Paris,US`. |
+| `src`  | query | no       | Same as for `/city`.                                                |
+
+Returns `cities` (one `/city` style snapshot per city, in the order asked) and `ranking` (cities sorted by pulse score, best first). A city that cannot be found does not fail the request: its entry is `{"query": ..., "err": ...}` and it is left out of the ranking. Returns 400 for fewer than 2 or more than 5 cities, or a malformed country code.
+
+The dashboard has the same view: open a city and use "Compare with", or go to `/?compare=Nairobi&compare=Kampala`.
 
 ### Response
 
