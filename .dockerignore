@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__/
+*/__pycache__/
+*.db
+*.db-shm
+*.db-wal
+.pytest_cache
+tests
+scripts
+docs
+present.txt
+uv.lock

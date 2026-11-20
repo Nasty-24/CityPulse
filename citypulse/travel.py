@@ -165,7 +165,9 @@ def climate_score(n):
     dryness = clamp(100 - (n.get("rainy_days") or 0) * 5)        # 20 rainy days -> 0
     sun = clamp((n.get("sunshine_hours") or 0) / 9 * 100)        # 9+ sunny hours/day -> 100
     muggy = max(0, (n.get("humidity") or 0) - 75) * 1.5 if n["avg_high"] > 28 else 0
-    return round(clamp(0.5 * warmth + 0.3 * dryness + 0.2 * sun - muggy))
+    # dry, sunny days only count as much as it is warm: a sunny 2 C day is still no holiday weather
+    pleasant = (0.3 * dryness + 0.2 * sun) * (0.4 + 0.6 * warmth / 100)
+    return round(clamp(0.5 * warmth + pleasant - muggy))
 
 
 # ---------------------------------------------------------------- safety

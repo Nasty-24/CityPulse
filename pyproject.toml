@@ -23,3 +23,9 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-root = ""
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

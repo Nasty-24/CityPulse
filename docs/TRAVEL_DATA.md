@@ -98,7 +98,7 @@ The trip score (0 to 100) weighs four areas for the chosen month:
 
 | Area | Weight | Built from |
 |---|---|---|
-| Climate | 40 | Warmth (about 26 °C afternoons are ideal), dry days, sunshine, and a penalty for heat with high humidity |
+| Climate | 40 | Warmth (about 26 °C afternoons are ideal), dry days and sunshine (which count for less when it's cold), and a penalty for heat with high humidity |
 | Safety | 30 | UK travel advice (40%), homicide rate (30%), political stability (15%), road deaths (15%) |
 | Health | 18 | WHO outbreaks in the last year (35%), malaria (25%), drinking water (20%), doctors (10%), vaccination (10%) |
 | Hazards | 12 | GDACS Red and Orange alerts in the last 90 days |

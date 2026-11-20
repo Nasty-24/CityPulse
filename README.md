@@ -1,18 +1,41 @@
 # CityPulse
 
-One request, one city, a full snapshot: weather and forecast, air quality, earthquakes, natural disasters, crime, currency vs USD, and vaccination coverage. Built with FastAPI. No API keys needed.
+A travel assistant that tells you **where and when to go**. For any city and month it brings together the weather you can expect, official travel warnings, crime and road safety, disease outbreaks and pandemics, malaria and drinking water, natural disaster alerts, costs and public holidays, all from free public sources. Built with FastAPI. No API keys needed.
 
 ```
-GET /city/Tokyo
-GET /city/Nairobi?src=weather&src=fx
-GET /city/Paris?country=US
+GET /destinations?month=7          where to go in July, best first
+GET /trip/Mombasa?month=7          everything to know about Mombasa in July
+GET /city/Tokyo                    live conditions right now
 ```
 
 ## Why
 
-Public data APIs are scattered, inconsistent, and flaky. CityPulse fans out to the relevant free sources, normalizes the results, and caches every source independently, so one failing provider never forces a refetch of the others.
+Planning a holiday means checking a dozen sites: climate tables, government travel advice, WHO outbreak news, disaster alerts, health advice, exchange rates. CityPulse fans out to the relevant free sources, normalizes the results, scores them, and turns them into plain warnings like "Rainy season: about 23 days with rain in July" or "UK travel advice: avoid all travel to parts of the country".
 
-## Features
+Every figure says where it came from. See [docs/TRAVEL_DATA.md](docs/TRAVEL_DATA.md) for every aspect a traveller weighs, the source behind each, and what could be added next.
+
+## Trip planning
+
+- **Where to go**: `/destinations?month=7` ranks 30 popular destinations (or your own shortlist) for a month by trip score
+- **Trip report**: `/trip/{city}?month=7` gives the trip score, the best months for weather, a "before you book" list of warnings, and the detail behind it
+- **Weather by month**: average highs and lows, rainy days, rainfall, sunshine, humidity and daylight, from the last 3 years of daily history
+- **Safety**: UK government travel advice level and latest change, homicide rate, road deaths, political stability
+- **Health and pandemics**: WHO outbreak reports naming the country in the last 12 months, worldwide alerts, malaria, drinking water access, doctors per 1,000 people, vaccination coverage
+- **Natural hazards**: GDACS cyclone, flood, drought, volcano and earthquake alerts from the last 90 days
+- **Money and practical**: price level for visitors, tourist numbers, public holidays in your travel month, languages, elevation
+- **Dashboard**: the web page at `/` asks "Where should you go in…?", ranks destinations, and shows each city's month-by-month weather chart
+
+### Trip score
+
+One 0 to 100 number for a city in a given month: weather 40%, safety 30%, health 18%, natural hazards 12%. Grades: 80+ Great time to go, 65+ Good time to go, 50+ Go with care, below 50 Think twice.
+
+- An official warning against travel to the whole country caps safety at 35, so it can't be averaged away.
+- A trip can't score more than 45 points above its weather score, so a freezing or monsoon month can't look great just because the country is safe.
+- Cost is shown but not scored.
+
+Full weights and thresholds: [docs/TRAVEL_DATA.md](docs/TRAVEL_DATA.md#how-the-trip-score-uses-this).
+
+## City snapshot features
 
 - 9 data sources behind one endpoint, including a 3-day forecast with sunrise and sunset
 - Pick only the sources you need with `?src=`
@@ -45,13 +68,62 @@ uvicorn main:app --reload
 Then:
 
 ```bash
+curl "localhost:8000/destinations?month=7"
+curl "localhost:8000/trip/Lisbon?month=7"
 curl localhost:8000/city/Tokyo
-curl "localhost:8000/city/Nairobi?src=weather&src=air"
 ```
 
 Dashboard: http://localhost:8000 | Interactive API docs: http://localhost:8000/docs
 
+The first `/destinations` call after a start collects safety and health data for 30 countries and takes a minute or two; after that it is cached and fast.
+
+### With Docker
+
+```bash
+docker build -t citypulse .
+docker run -p 8000:8000 -v citypulse-cache:/data citypulse
+```
+
+The cache is kept on the `citypulse-cache` volume so it survives restarts. The container runs as a non-root user and has a health check.
+
+### Tests
+
+```bash
+pip install pytest
+python -m pytest
+```
+
+The tests run offline: every upstream API is replaced with fake data, so they are fast and never fail because a public API is down.
+
+### Refreshing the bundled climate data
+
+Monthly weather averages for the 30 built-in destinations ship in `citypulse/data/climate_normals.json`, which keeps `/destinations` fast and within Open-Meteo's free rate limits. To refresh them (takes a few minutes, by design):
+
+```bash
+python scripts/build_climate_normals.py
+```
+
 ## API
+
+### `GET /destinations`
+
+| Param   | In    | Required | Description |
+|---------|-------|----------|-------------|
+| `month` | query | no       | 1 to 12. Defaults to next month. |
+| `city`  | query | no       | Repeat 2 to 12 times to rank your own shortlist, e.g. `city=Lisbon&city=Paris,FR`. Omit for the 30 built-in destinations. |
+| `limit` | query | no       | How many to return, 1 to 30. Default 10. |
+
+Returns `destinations`, best first, each with its trip score, that month's weather, UK advisory level, price level, best months and top caution. Cities whose weather data is missing are marked `"complete": false` and ranked after complete ones. Cities that can't be found are listed in `not_ranked`.
+
+### `GET /trip/{name}`
+
+| Param     | In    | Required | Description |
+|-----------|-------|----------|-------------|
+| `name`    | path  | yes      | City name |
+| `month`   | query | no       | 1 to 12. Defaults to next month. |
+| `country` | query | no       | ISO 3166-1 alpha-2 code to pick the right city |
+
+Returns `trip` (score, grade, parts), `best_months`, `cautions` (plain-language warnings), `climate` (that month) and `climate_by_month` (all 12, each with a weather score), `safety` (including `advisory`), `health` (including `outbreaks`), `hazards`, `costs`, `practical` (languages, public holidays that month) and `unavailable` (sections that could not be loaded). Every figure carries its `source` and year.
 
 ### `GET /city/{name}`
 
@@ -194,10 +266,15 @@ main.py                 entry point for `uvicorn main:app`
 citypulse/api.py        FastAPI app and routes
 citypulse/sources.py    one fetcher per data source, plus the SOURCES registry
 citypulse/cache.py      two-tier cache
-citypulse/scoring.py    pulse score
+citypulse/scoring.py    pulse score and shared scoring helpers
+citypulse/travel.py     trip planning: monthly climate, advisories, outbreaks, hazards, health, costs, trip score
+citypulse/data/         bundled climate averages for the built-in destinations
 citypulse/labels.py     weather and AQI labels
 citypulse/upstream.py   shared HTTP client
-static/index.html       web dashboard served at /
+static/index.html       web dashboard (trip planner) served at /
+scripts/                maintenance scripts, e.g. rebuilding climate data
+tests/                  offline test suite
+docs/TRAVEL_DATA.md     every travel aspect and its data source
 cache.db                created at runtime
 ```
 
