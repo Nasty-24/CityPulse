@@ -1,6 +1,8 @@
 """FastAPI app: routes for the dashboard, city snapshots and comparisons."""
 
 import asyncio
+import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -8,16 +10,39 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 
 from . import __version__
-from .cache import ROOT, cached
+from .cache import ROOT, cached, store
 from .scoring import pulse_score
 from .sources import SOURCES, CityNotFound, find_place
+from .upstream import client
+
+log = logging.getLogger("citypulse")
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    yield
+    await client.aclose()
+    store.close()
+
 
 app = FastAPI(
     title="CityPulse",
     description="One request, one city, a full snapshot: weather, forecast, air quality, earthquakes, "
                 "disasters, crime, currency and vaccination data from free public sources.",
     version=__version__,
+    lifespan=lifespan,
 )
+
+
+def public_error(e: Exception) -> str:
+    """What callers see when a source fails. Details go to the server log only."""
+    if isinstance(e, httpx.TimeoutException):
+        return "source timed out"
+    if isinstance(e, httpx.HTTPStatusError):
+        return f"source returned HTTP {e.response.status_code}"
+    if isinstance(e, httpx.HTTPError):
+        return "source unreachable"
+    return "source returned unexpected data"
 
 SRC_HELP = f"Repeatable. Any of: {', '.join(SOURCES)}. Omit for all."
 
@@ -34,14 +59,9 @@ async def city_not_found(_, e: CityNotFound):
 
 @app.exception_handler(httpx.HTTPError)
 async def upstream_failed(_, e: httpx.HTTPError):
-    try:
-        url = str(e.request.url)
-    except RuntimeError:
-        url = None
-    response = getattr(e, "response", None)
-    return JSONResponse({"err": type(e).__name__,
-                         "upstream": response.status_code if response is not None else None,
-                         "url": url, "body": response.text[:200] if response is not None else str(e)}, 502)
+    # only reached when the city lookup itself fails; per-source failures are handled in snapshot()
+    log.warning("city lookup failed: %r", e)
+    return JSONResponse({"detail": f"city lookup failed: {public_error(e)}"}, 502)
 
 
 def check_sources(src):
@@ -68,7 +88,8 @@ async def snapshot(name: str, country_code: str | None, wanted: list[str]):
                                          lambda: source.fetch(place))
             return src_name, {"data": value, "cache": status}
         except Exception as e:
-            return src_name, {"data": None, "err": f"{type(e).__name__}: {e}"}
+            log.warning("source %s failed for %s: %r", src_name, place.get("name"), e)
+            return src_name, {"data": None, "err": public_error(e)}
 
     res = dict(await asyncio.gather(*(read(s) for s in wanted)))
     info = {k: place.get(k) for k in ("name", "country", "latitude", "longitude",
@@ -117,7 +138,8 @@ async def compare(
         except CityNotFound as e:
             return {"query": f"{name},{cc}" if cc else name, "err": str(e)}
         except httpx.HTTPError as e:
-            return {"query": name, "err": f"lookup failed: {type(e).__name__}"}
+            log.warning("compare lookup failed for %s: %r", name, e)
+            return {"query": name, "err": f"city lookup failed: {public_error(e)}"}
 
     results = await asyncio.gather(*(one(n, cc) for n, cc in specs))
     ranking = sorted(

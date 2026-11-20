@@ -68,7 +68,7 @@ Errors:
 | 400  | Unknown `src` value                          |
 | 404  | City not found (in `country`, if given)      |
 | 422  | `country` is not a two-letter code           |
-| 502  | Geocoding upstream failed (see body for why) |
+| 502  | City lookup failed upstream (`detail` says how) |
 
 Per source failures do not fail the request. They appear inside `res`.
 
@@ -121,7 +121,7 @@ The dashboard has the same view: open a city and use "Compare with", or go to `/
     },
     "fx": {
       "data": null,
-      "err": "ConnectTimeout: "
+      "err": "source timed out"
     }
   }
 }
@@ -133,7 +133,7 @@ Each entry in `res` has:
 |---------|----------------------------------------------------------------------|
 | `data`  | Normalized payload, or `null` on failure                             |
 | `cache` | `hit` (fresh cache), `miss` (just fetched), `stale` (refresh failed, old value served) |
-| `err`   | Present only when `data` is `null`. Exception type and message.      |
+| `err`   | Present only when `data` is `null`. A short reason, such as `source timed out`. |
 
 Weather code values follow the WMO weather interpretation codes used by Open-Meteo; `weather` is the matching description. `aqi_category` uses the US EPA bands (Good, Moderate, Unhealthy for sensitive groups, Unhealthy, Very unhealthy, Hazardous).
 
@@ -185,30 +185,36 @@ SQLite schema:
 create table c(k text primary key, exp real, val text)
 ```
 
-`val` is the JSON payload, `exp` is the expiry as a unix timestamp. The file is `cache.db`, created next to `main.py`. WAL mode is on.
+`val` is the JSON payload, `exp` is the expiry as a unix timestamp. The file is `cache.db` in the project root (override with the `CITYPULSE_CACHE_DB` environment variable). WAL mode is on, and SQLite calls run in a worker thread so they never block the event loop. The in-memory tier keeps at most 5,000 entries, dropping the least recently used first; per-key locks are released as soon as no request needs them.
 
 ## Project layout
 
 ```
-main.py            app, cache, fetchers, source registry, endpoints
-static/index.html  web dashboard served at /
-cache.db           created at runtime
+main.py                 entry point for `uvicorn main:app`
+citypulse/api.py        FastAPI app and routes
+citypulse/sources.py    one fetcher per data source, plus the SOURCES registry
+citypulse/cache.py      two-tier cache
+citypulse/scoring.py    pulse score
+citypulse/labels.py     weather and AQI labels
+citypulse/upstream.py   shared HTTP client
+static/index.html       web dashboard served at /
+cache.db                created at runtime
 ```
 
 Adding a source takes 2 steps:
 
-1. Write `async def fn(g)` where `g` is the geocoding result (`id`, `latitude`, `longitude`, `country_code`, ...) and return a JSON serializable value
-2. Register it: `S["name"] = (ttl_seconds, fn, "city")` or `"cc"` for country scope
+1. Write `async def fetch_something(place)` in `citypulse/sources.py`, where `place` is the geocoding result (`id`, `latitude`, `longitude`, `country_code`, ...), and return a JSON serializable value
+2. Register it in `SOURCES`: `"something": Source(ttl_seconds, fetch_something, "city")`, or `"country"` to cache once per country
 
-Sources that need country info (like `fx`) call `cnc(g)`, which reads the shared `country` cache entry.
+Sources that need country facts (like `fx`) call `country_info(place)`, which reads the shared `country` cache entry.
 
 ## HTTP client notes
 
-- `httpx.AsyncClient` with a 15 s total and 5 s connect timeout
+- `httpx.AsyncClient` with a 15 s total and 10 s connect timeout, closed cleanly on shutdown
 - `AsyncHTTPTransport(retries=2, local_address="0.0.0.0")` retries connection failures and forces IPv4
-- Send an honest `User-Agent` such as `citypulse/0.1 (you@example.com)`. Several providers rate limit or block anonymous or spoofed agents.
+- Send an honest `User-Agent` (set in `citypulse/upstream.py`). Several providers rate limit or block anonymous or spoofed agents.
 - A custom transport makes httpx ignore proxy environment variables. If you are behind a proxy, pass `proxy=os.environ.get("HTTPS_PROXY")` to the transport.
-- Upstream `httpx` errors outside the per source wrapper (for example geocoding) return a 502 with `err`, `upstream`, `url`, and `body`.
+- Errors shown to callers are short and generic (`source timed out`, `source returned HTTP 503`, ...). Full details, including upstream URLs, go to the server log only.
 
 ## Verify before relying on
 
@@ -226,6 +232,5 @@ REST Countries v1 to v4 are retired and v5 needs an account and key, so this pro
 - Geocoding takes the first match. "Paris" resolves to whatever the geocoder ranks first; pass `?country=` to narrow it.
 - `fx` rates update once a day, so they are not suitable for trading
 - L1 cache is per process. Multiple workers share L2 via SQLite and may duplicate some fetches.
-- SQLite calls are synchronous on the event loop. Fine at hackathon scale, wrap in `asyncio.to_thread` or use `aiosqlite` for more load.
 - No auth and no rate limiting on the API itself
 - Disaster data (EONET) lists major events only, so an empty list is common
