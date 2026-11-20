@@ -5,6 +5,7 @@ One request, one city, a full snapshot: weather, air quality, earthquakes, natur
 ```
 GET /city/Tokyo
 GET /city/Nairobi?src=weather&src=fx
+GET /city/Paris?country=US
 ```
 
 ## Why
@@ -20,8 +21,11 @@ Public data APIs are scattered, inconsistent, and flaky. CityPulse fans out to t
 - Stale-on-error: if a refresh fails, the last good value is served and flagged `stale`
 - Per-key locking: concurrent identical requests cause one upstream call
 - Partial results: a failed source returns `data: null` plus an error, the rest still come back
+- Disambiguate cities with `?country=` (ISO2 code, e.g. `FR`, `US`)
+- Human-readable labels: weather description and AQI category alongside the raw values
+- Exchange rates for ~160 currencies
 - Zero API keys
-- Auto generated docs at `/docs` (Swagger) and `/redoc`
+- Auto generated docs at `/docs` (Swagger) and `/redoc`; `/` redirects there
 
 ## Quick start
 
@@ -49,15 +53,17 @@ Interactive docs: http://localhost:8000/docs
 
 | Param  | In    | Required | Description                                                      |
 |--------|-------|----------|------------------------------------------------------------------|
-| `name` | path  | yes      | City name. The first geocoding match is used.                    |
-| `src`  | query | no       | Repeatable. One of the src keys above. Omitted means all of them.|
+| `name`    | path  | yes      | City name. The first geocoding match is used.                    |
+| `src`     | query | no       | Repeatable. One of `weather`, `air`, `quakes`, `disasters`, `crime`, `country`, `fx`, `vaccines`. Omitted means all of them.|
+| `country` | query | no       | ISO 3166-1 alpha-2 code. Restricts the city lookup to that country, e.g. `?country=US` for Paris, Texas. |
 
 Errors:
 
 | Code | When                                         |
 |------|----------------------------------------------|
 | 400  | Unknown `src` value                          |
-| 404  | City not found                               |
+| 404  | City not found (in `country`, if given)      |
+| 422  | `country` is not a two-letter code           |
 | 502  | Geocoding upstream failed (see body for why) |
 
 Per source failures do not fail the request. They appear inside `res`.
@@ -74,11 +80,11 @@ Per source failures do not fail the request. They appear inside `res`.
   },
   "res": {
     "weather": {
-      "data": { "time": "2026-10-30T23:00", "interval": 900, "temperature_2m": 14.9, "wind_speed_10m": 5.0, "weather_code": 0 },
+      "data": { "time": "2026-10-30T23:00", "interval": 900, "temperature_2m": 14.9, "wind_speed_10m": 5.0, "weather_code": 0, "weather": "Clear sky" },
       "cache": "miss"
     },
     "air": {
-      "data": { "time": "2026-10-30T23:00", "interval": 3600, "us_aqi": 151, "pm2_5": 54.8 },
+      "data": { "time": "2026-10-30T23:00", "interval": 3600, "us_aqi": 151, "pm2_5": 54.8, "aqi_category": "Unhealthy" },
       "cache": "hit"
     },
     "quakes": {
@@ -105,7 +111,9 @@ Each entry in `res` has:
 | `cache` | `hit` (fresh cache), `miss` (just fetched), `stale` (refresh failed, old value served) |
 | `err`   | Present only when `data` is `null`. Exception type and message.      |
 
-Weather code values follow the WMO weather interpretation codes used by Open-Meteo.
+Weather code values follow the WMO weather interpretation codes used by Open-Meteo; `weather` is the matching description. `aqi_category` uses the US EPA bands (Good, Moderate, Unhealthy for sensitive groups, Unhealthy, Very unhealthy, Hazardous).
+
+Exchange rates come from [open.er-api.com](https://www.exchangerate-api.com/docs/free) (free, no key, updated daily). One USD rate table is fetched and cached for all countries.
 
 ## How caching works
 
@@ -166,8 +174,8 @@ REST Countries v1 to v4 are retired and v5 needs an account and key, so this pro
 ## Limitations
 
 - Crime is country level homicide rate only, except street level counts for UK cities. There is no free global city level crime source.
-- Geocoding takes the first match. "Paris" resolves to whatever the geocoder ranks first. A `country` query param is a natural next step.
-- `fx` covers only ECB published currencies
+- Geocoding takes the first match. "Paris" resolves to whatever the geocoder ranks first; pass `?country=` to narrow it.
+- `fx` rates update once a day, so they are not suitable for trading
 - L1 cache is per process. Multiple workers share L2 via SQLite and may duplicate some fetches.
 - SQLite calls are synchronous on the event loop. Fine at hackathon scale, wrap in `asyncio.to_thread` or use `aiosqlite` for more load.
 - No auth and no rate limiting on the API itself

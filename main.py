@@ -2,9 +2,18 @@ import asyncio, time
 from datetime import datetime, timedelta, timezone
 import httpx
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
-app = FastAPI()
+app = FastAPI(
+    title="CityPulse",
+    description="One request, one city, a full snapshot: weather, air quality, earthquakes, "
+                "disasters, crime, currency and vaccination data from 8 free sources.",
+    version="0.1.0",
+)
+
+@app.get("/", include_in_schema=False)
+async def home():
+    return RedirectResponse("/docs")
 cl = httpx.AsyncClient(
     timeout=httpx.Timeout(15, connect=10),
     transport=httpx.AsyncHTTPTransport(retries=2, local_address="0.0.0.0"),
@@ -91,13 +100,23 @@ async def fx(g):
         return None
     if cur == "USD":
         return {"cur": cur, "per_usd": 1.0}
-    try:
-        j = await get("https://api.frankfurter.dev/v1/latest", base="USD", symbols=cur)
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code in (404, 422):
-            return {"cur": cur, "per_usd": None, "note": "unsupported"}
-        raise
-    return {"cur": cur, "per_usd": j["rates"][cur], "date": j["date"]}
+    j, _ = await usd_rates()
+    rate = j["rates"].get(cur)
+    if rate is None:
+        return {"cur": cur, "per_usd": None, "note": "unsupported"}
+    return {"cur": cur, "per_usd": rate, "date": j["date"]}
+
+async def _usd_rates():
+    # open.er-api.com: free, no key, ~160 currencies, refreshed daily
+    j = await get("https://open.er-api.com/v6/latest/USD")
+    if j.get("result") != "success":
+        raise RuntimeError(f"fx upstream: {j.get('error-type', 'unknown error')}")
+    d = datetime.fromtimestamp(j["time_last_update_unix"], timezone.utc).strftime("%Y-%m-%d")
+    return {"rates": j["rates"], "date": d}
+
+def usd_rates():
+    # one shared table for all countries instead of one upstream call per country
+    return cached("fx_table:USD", 3600, _usd_rates)
 
 async def ds(g):
     la, lo = g["latitude"], g["longitude"]
@@ -135,21 +154,51 @@ async def vac(g):
 
     return dict(await asyncio.gather(*map(one, V)))
 
-async def geo(n):
-    j = await get("https://geocoding-api.open-meteo.com/v1/search", name=n, count=1)
+async def geo(n, cc=None):
+    p = {"name": n, "count": 1}
+    if cc:
+        p["countryCode"] = cc
+    j = await get("https://geocoding-api.open-meteo.com/v1/search", **p)
     if not j.get("results"):
-        raise HTTPException(404, "city not found")
+        raise HTTPException(404, "city not found" + (f" in country {cc}" if cc else ""))
     return j["results"][0]
 
 async def wx(g):
     j = await get("https://api.open-meteo.com/v1/forecast", latitude=g["latitude"],
                   longitude=g["longitude"], current="temperature_2m,wind_speed_10m,weather_code")
-    return j["current"]
+    c = j["current"]
+    c["weather"] = WMO.get(c.get("weather_code"), "Unknown")
+    return c
+
+# WMO weather interpretation codes, as used by Open-Meteo
+WMO = {
+    0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+    45: "Fog", 48: "Depositing rime fog",
+    51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
+    56: "Light freezing drizzle", 57: "Dense freezing drizzle",
+    61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
+    66: "Light freezing rain", 67: "Heavy freezing rain",
+    71: "Slight snowfall", 73: "Moderate snowfall", 75: "Heavy snowfall", 77: "Snow grains",
+    80: "Slight rain showers", 81: "Moderate rain showers", 82: "Violent rain showers",
+    85: "Slight snow showers", 86: "Heavy snow showers",
+    95: "Thunderstorm", 96: "Thunderstorm with slight hail", 99: "Thunderstorm with heavy hail",
+}
+
+# US EPA AQI bands: (upper bound, label)
+AQI = [(50, "Good"), (100, "Moderate"), (150, "Unhealthy for sensitive groups"),
+       (200, "Unhealthy"), (300, "Very unhealthy")]
+
+def aqi_label(v):
+    if v is None:
+        return None
+    return next((name for hi, name in AQI if v <= hi), "Hazardous")
 
 async def aq(g):
     j = await get("https://air-quality-api.open-meteo.com/v1/air-quality", latitude=g["latitude"],
                   longitude=g["longitude"], current="us_aqi,pm2_5")
-    return j["current"]
+    c = j["current"]
+    c["aqi_category"] = aqi_label(c.get("us_aqi"))
+    return c
 
 async def eq(g):
     t = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -181,12 +230,19 @@ async def he(_, e):
                          "url": u, "body": r.text[:200] if r is not None else str(e)}, 502)
 
 @app.get("/city/{name}")
-async def city(name: str, src: list[str] = Query(None)):
+async def city(
+    name: str,
+    src: list[str] = Query(None, description=f"Repeatable. Any of: {', '.join(S)}. Omit for all."),
+    country: str | None = Query(None, pattern="^[A-Za-z]{2}$",
+                                description="ISO 3166-1 alpha-2 code to pick the right city, e.g. FR or US"),
+):
     want = src or list(S)
     bad = [s for s in want if s not in S]
     if bad:
         raise HTTPException(400, f"unknown src: {bad}")
-    g, _ = await cached(f"geo:{name.lower()}", 30 * 86400, lambda: geo(name))
+    cc = country.upper() if country else None
+    gk = f"geo:{name.lower()}" + (f":{cc}" if cc else "")
+    g, _ = await cached(gk, 30 * 86400, lambda: geo(name, cc))
 
     async def one(s):
         ttl, fn, sc = S[s]
