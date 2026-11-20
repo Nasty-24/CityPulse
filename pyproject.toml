@@ -1,6 +1,6 @@
 [project]
 name = "citypulse"
-version = "0.1.0"
+version = "0.2.0"
 description = "One API call, one city, a full snapshot: weather, forecast, air quality, earthquakes, disasters, crime, currency and vaccination data from free public sources, scored and cached."
 readme = "README.md"
 authors = [
@@ -20,3 +20,6 @@ citypulse = "citypulse:main"
 [build-system]
 requires = ["uv_build>=0.12.2,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
