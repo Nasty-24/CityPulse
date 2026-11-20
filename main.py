@@ -211,6 +211,49 @@ async def eq(g):
     m = [f["properties"]["mag"] for f in j["features"]]
     return {"n": len(m), "max": max(m, default=None)}
 
+def clamp(x, lo=0.0, hi=100.0):
+    return max(lo, min(hi, x))
+
+# Pulse score: each reading becomes a 0-100 sub-score (higher = better),
+# then a weighted average over the readings that are available.
+PULSE_WEIGHTS = {"air": 25, "crime": 20, "weather": 15, "quakes": 15, "vaccines": 15, "disasters": 10}
+PULSE_GRADES = [(80, "Thriving"), (60, "Steady"), (40, "Strained"), (0, "Under stress")]
+
+def pulse_parts(res):
+    d = {k: v.get("data") for k, v in res.items()}
+    parts = {}
+    if (a := d.get("air")) and a.get("us_aqi") is not None:
+        parts["air"] = clamp(100 - a["us_aqi"] / 3)  # AQI 0 -> 100, 150 -> 50, 300+ -> 0
+    if (w := d.get("weather")) and w.get("temperature_2m") is not None:
+        s = 100 - abs(w["temperature_2m"] - 21) * 4  # comfort peaks at 21 C
+        code = w.get("weather_code") or 0
+        if code in (65, 67, 75, 82, 86) or code >= 95:  # heavy rain/snow, storms
+            s -= 30
+        parts["weather"] = clamp(s)
+    if (q := d.get("quakes")) is not None:
+        m = q.get("max") or 0
+        parts["quakes"] = clamp(100 - max(0, m - 4) * 25)  # under M4 is harmless
+    if (x := d.get("disasters")) is not None:
+        parts["disasters"] = clamp(100 - x["n"] * 20)
+    if (c := d.get("crime")) and c.get("homicide_100k"):
+        parts["crime"] = clamp(100 - c["homicide_100k"]["v"] * 4)  # 25 per 100k -> 0
+    if v := d.get("vaccines"):
+        vals = [v[k]["v"] for k in ("dtp3", "mcv1") if v.get(k)]
+        if vals:
+            parts["vaccines"] = clamp(sum(vals) / len(vals))
+    return parts
+
+def pulse_score(res):
+    parts = pulse_parts(res)
+    if not parts:
+        return None
+    w = sum(PULSE_WEIGHTS[k] for k in parts)
+    score = round(sum(parts[k] * PULSE_WEIGHTS[k] for k in parts) / w)
+    grade = next(g for lo, g in PULSE_GRADES if score >= lo)
+    return {"score": score, "grade": grade,
+            "parts": {k: round(v) for k, v in parts.items()},
+            "based_on": f"{len(parts)} of {len(PULSE_WEIGHTS)} readings"}
+
 S = {
     "weather": (600, wx, "city"),
     "air": (1800, aq, "city"),
@@ -257,4 +300,5 @@ async def city(
             return s, {"data": None, "err": f"{type(e).__name__}: {e}"}
 
     res = dict(await asyncio.gather(*(one(s) for s in want)))
-    return {"city": {k: g.get(k) for k in ("name", "country", "latitude", "longitude")}, "res": res}
+    return {"city": {k: g.get(k) for k in ("name", "country", "latitude", "longitude")},
+            "pulse": pulse_score(res), "res": res}

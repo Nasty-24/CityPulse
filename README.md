@@ -26,6 +26,7 @@ Public data APIs are scattered, inconsistent, and flaky. CityPulse fans out to t
 - Exchange rates for ~160 currencies
 - Zero API keys
 - Web dashboard at `/`: search a city and see every reading, with a pulse line that spikes on notable values
+- Pulse score: one 0 to 100 number per city, with a per-reading breakdown
 - Auto generated docs at `/docs` (Swagger) and `/redoc`
 
 ## Quick start
@@ -115,6 +116,30 @@ Each entry in `res` has:
 Weather code values follow the WMO weather interpretation codes used by Open-Meteo; `weather` is the matching description. `aqi_category` uses the US EPA bands (Good, Moderate, Unhealthy for sensitive groups, Unhealthy, Very unhealthy, Hazardous).
 
 Exchange rates come from [open.er-api.com](https://www.exchangerate-api.com/docs/free) (free, no key, updated daily). One USD rate table is fetched and cached for all countries.
+
+## Pulse score
+
+Every response includes a `pulse` object: one 0 to 100 number (higher is better) that sums up how the city is doing.
+
+```json
+"pulse": {
+  "score": 76,
+  "grade": "Steady",
+  "parts": { "air": 79, "weather": 40, "quakes": 48, "disasters": 100, "crime": 99, "vaccines": 92 },
+  "based_on": "6 of 6 readings"
+}
+```
+
+| Part        | Weight | 100 means                     | 0 means                         |
+|-------------|--------|-------------------------------|---------------------------------|
+| `air`       | 25     | AQI 0                         | AQI 300 or worse                |
+| `crime`     | 20     | No homicides                  | 25+ homicides per 100k          |
+| `weather`   | 15     | 21 °C, no storms              | 25 °C away from 21, or storms lower it by 30 |
+| `quakes`    | 15     | Nothing above M4 in 30 days   | M8 or stronger                  |
+| `vaccines`  | 15     | 100% DTP3 and MCV1 coverage   | 0% coverage                     |
+| `disasters` | 10     | No active events nearby       | 5 or more active events         |
+
+Grades: 80+ Thriving, 60+ Steady, 40+ Strained, below 40 Under stress. Missing or failed readings are left out and the weights are rebalanced over the rest; `based_on` says how many were used. If nothing is available, `pulse` is `null`. The weights are a judgment call, not a scientific index, and live in `PULSE_WEIGHTS` in `main.py`.
 
 ## How caching works
 

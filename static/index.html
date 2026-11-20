@@ -70,6 +70,19 @@ form.search { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.5rem 0 0; }
   letter-spacing: -0.035em; margin: 0; overflow-wrap: anywhere;
 }
 .hero .where { color: var(--muted); font-size: 1.15rem; margin: .6rem 0 0; }
+.hero-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem 2rem; }
+.score { text-align: right; }
+.score .n { font: 800 clamp(3rem, 9vw, 5.5rem)/0.9 var(--display); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.score .n small { font: 400 1.1rem var(--body); color: var(--muted); letter-spacing: 0; }
+.score .g { font: 600 1.15rem var(--display); margin-top: .25rem; }
+.score details { font-size: .9rem; color: var(--muted); margin-top: .35rem; }
+.score summary { cursor: pointer; }
+.score details p { max-width: 17rem; margin: .5rem 0 0 auto; }
+@media (max-width: 40rem) { .score details p { margin-left: 0; } }
+.score table { margin: .5rem 0 0 auto; border-collapse: collapse; text-align: left; }
+.score td { padding: .15rem 0 .15rem 1rem; font-variant-numeric: tabular-nums; }
+.score td:last-child { text-align: right; color: var(--ink); }
+@media (max-width: 40rem) { .score { text-align: left; } .score table { margin-left: 0; } .score td:first-child { padding-left: 0; } }
 .pulse { display: block; width: 100%; height: 96px; margin: 1.25rem 0 0; overflow: visible; }
 .pulse path { fill: none; stroke: var(--pulse); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .pulse .base { stroke: var(--line); stroke-width: 1; }
@@ -166,6 +179,22 @@ function pulseSVG(items) {
     <div class="pulse-labels">${labels}</div>`;
 }
 
+const PART_NAMES = { air: "Air quality", crime: "Safety", weather: "Weather comfort", quakes: "Earthquakes", vaccines: "Vaccination", disasters: "Natural events" };
+function gradeClass(s) { return s >= 60 ? "good" : s >= 40 ? "fair" : "poor"; }
+
+function scoreBlock(p) {
+  if (!p) return "";
+  const rows = Object.entries(p.parts).map(([k, v]) => `<tr><td>${PART_NAMES[k] || k}</td><td>${v}</td></tr>`).join("");
+  return `<div class="score" aria-label="Pulse score ${p.score} out of 100, ${esc(p.grade)}">
+    <div class="n">${p.score}<small> /100</small></div>
+    <div class="g ${gradeClass(p.score)}">${esc(p.grade)}</div>
+    <details><summary>How this is scored</summary>
+      <table>${rows}</table>
+      <p>Each reading is scored 0 to 100, higher is better, then averaged with weights. Based on ${esc(p.based_on)}.</p>
+    </details>
+  </div>`;
+}
+
 function reading(k, entry, body) {
   if (!entry || entry.data == null) {
     return `<div class="reading na"><div class="k">${k}</div><div class="v">Unavailable right now</div></div>`;
@@ -203,8 +232,13 @@ function render(j) {
 
   $("#out").innerHTML = `
     <section class="hero">
-      <h1>${esc(c.name)}</h1>
-      <p class="where">${esc(c.country)}${co ? `, ${esc(co.region.trim())}. ${esc(co.income)}` : ""}</p>
+      <div class="hero-top">
+        <div>
+          <h1>${esc(c.name)}</h1>
+          <p class="where">${esc(c.country)}${co ? `, ${esc(co.region.trim())}. ${esc(co.income)}` : ""}</p>
+        </div>
+        ${scoreBlock(j.pulse)}
+      </div>
       ${pulseSVG(intensities(r))}
       <p class="summary">${summary}</p>
     </section>
