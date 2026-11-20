@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CityPulse</title>
+<meta name="description" content="Live weather, air quality, hazards, crime, currency and health data for any city.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #EEF2F5;
+  --raised: #F8FAFB;
+  --ink: #14213D;
+  --muted: #5B6B7D;
+  --line: #C9D3DC;
+  --pulse: #E08A1E;
+  --good: #2E8B57;
+  --fair: #B8860B;
+  --poor: #C0392B;
+  --display: "Bricolage Grotesque", system-ui, sans-serif;
+  --body: "Source Sans 3", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0F1A2E; --raised: #16233B; --ink: #E6ECF2; --muted: #93A3B5;
+    --line: #2A3A55; --pulse: #F0A440; --good: #4CC38A; --fair: #E0B341; --poor: #F0705E;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 400 1.0625rem/1.55 var(--body);
+}
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--pulse); outline-offset: 2px; }
+
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 1rem; }
+@media (min-width: 48rem) { .wrap { padding: 0 2rem; } }
+
+/* top bar */
+.bar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; padding: 1.25rem 0; }
+.brand { font: 800 1.25rem/1 var(--display); letter-spacing: -0.01em; text-decoration: none; }
+.brand svg { vertical-align: -3px; margin-right: .35rem; }
+.bar nav a { color: var(--muted); font-size: .95rem; text-decoration: none; margin-left: 1.25rem; }
+.bar nav a:hover { color: var(--ink); text-decoration: underline; }
+
+/* search */
+form.search { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.5rem 0 0; }
+.search input {
+  font: inherit; color: var(--ink); background: var(--raised);
+  border: 1px solid var(--line); border-radius: 6px; padding: .7rem .9rem;
+}
+.search input[name=city] { flex: 1 1 14rem; min-width: 0; }
+.search input[name=country] { flex: 0 0 6.5rem; text-transform: uppercase; }
+.search button {
+  font: 600 1rem var(--body); color: var(--paper); background: var(--ink);
+  border: 0; border-radius: 6px; padding: .7rem 1.3rem; cursor: pointer;
+}
+.search button:disabled { opacity: .6; cursor: progress; }
+.hint { color: var(--muted); font-size: .9rem; margin: .5rem 0 0; }
+.hint button { font: inherit; color: var(--ink); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+
+/* hero */
+.hero { padding: 2.5rem 0 1rem; }
+.hero h1 {
+  font: 800 clamp(3rem, 11vw, 7.5rem)/0.92 var(--display);
+  letter-spacing: -0.035em; margin: 0; overflow-wrap: anywhere;
+}
+.hero .where { color: var(--muted); font-size: 1.15rem; margin: .6rem 0 0; }
+.pulse { display: block; width: 100%; height: 96px; margin: 1.25rem 0 0; overflow: visible; }
+.pulse path { fill: none; stroke: var(--pulse); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.pulse .base { stroke: var(--line); stroke-width: 1; }
+.pulse { height: 80px; }
+.pulse-labels { display: flex; color: var(--muted); font-size: .8rem; margin-top: .25rem; }
+.pulse-labels span { flex: 1; text-align: center; transform: translateX(-5%); }
+@media (max-width: 30rem) { .pulse-labels { font-size: .7rem; } }
+.pulse.draw path.trace { stroke-dasharray: 2000; stroke-dashoffset: 2000; animation: draw 1.4s ease-out forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .pulse.draw path.trace { animation: none; stroke-dashoffset: 0; } }
+.summary { font-size: 1.2rem; max-width: 40rem; margin: 1.25rem 0 0; }
+
+/* readings */
+.groups { display: grid; gap: 2.5rem; padding: 2rem 0 3rem; }
+@media (min-width: 60rem) { .groups { grid-template-columns: 1.15fr 1fr 1fr; gap: 3rem; } }
+.group h2 { font: 600 1.05rem/1.2 var(--display); color: var(--muted); margin: 0 0 .75rem; padding-bottom: .5rem; border-bottom: 2px solid var(--ink); }
+.reading { padding: .9rem 0; border-bottom: 1px solid var(--line); }
+.reading .k { color: var(--muted); font-size: .95rem; }
+.reading .v { font: 600 1.9rem/1.15 var(--display); letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+.reading .v small { font: 400 1rem var(--body); color: var(--muted); letter-spacing: 0; }
+.reading .d { font-size: .95rem; }
+.reading.na .v { color: var(--muted); font-size: 1.1rem; font-weight: 400; font-family: var(--body); }
+.chip { display: inline-block; font-size: .85rem; font-weight: 600; padding: .1rem .55rem; border-radius: 999px; border: 1.5px solid currentColor; margin-left: .35rem; vertical-align: .25rem; }
+.good { color: var(--good); } .fair { color: var(--fair); } .poor { color: var(--poor); }
+.reading ul { margin: .35rem 0 0; padding-left: 1.1rem; font-size: .95rem; }
+.stale { color: var(--fair); font-size: .85rem; }
+
+/* states */
+.empty { padding: 3rem 0 4rem; max-width: 36rem; }
+.empty h1 { font: 800 clamp(2.5rem, 8vw, 4.5rem)/1 var(--display); letter-spacing: -0.03em; margin: 0 0 1rem; }
+.error { color: var(--poor); font-weight: 600; margin: 1rem 0 0; }
+.loading .hero h1 { opacity: .35; }
+footer { color: var(--muted); font-size: .9rem; border-top: 1px solid var(--line); padding: 1.25rem 0 2rem; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <a class="brand" href="/">
+      <svg width="22" height="16" viewBox="0 0 22 16" aria-hidden="true"><path d="M1 9h5l2-6 4 11 2-5h7" fill="none" stroke="var(--pulse)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>CityPulse
+    </a>
+    <nav><a href="/docs">API docs</a><a href="https://github.com/Nasty-24/CityPulse">GitHub</a></nav>
+  </header>
+
+  <form class="search" id="search" role="search">
+    <label class="sr" for="city" hidden>City</label>
+    <input id="city" name="city" placeholder="Search a city, e.g. Nairobi" autocomplete="off" required aria-label="City">
+    <input id="country" name="country" placeholder="Country" maxlength="2" aria-label="Country code, optional" title="Optional two-letter country code, e.g. FR">
+    <button type="submit" id="go">Check city</button>
+  </form>
+  <p class="hint">Try <button data-c="Nairobi">Nairobi</button>, <button data-c="Tokyo">Tokyo</button>, <button data-c="Paris" data-cc="US">Paris, US</button> or <button data-c="London">London</button>.</p>
+
+  <main id="out">
+    <section class="empty">
+      <h1>How is your city doing right now?</h1>
+      <p>Type a city to see its weather, air quality, recent earthquakes and disasters, crime rate, currency and vaccination coverage, gathered live from 8 public sources.</p>
+    </section>
+  </main>
+
+  <footer>Data from Open-Meteo, USGS, NASA EONET, World Bank, UK Police, ExchangeRate-API and WHO. Readings are cached for up to a day per source.</footer>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (n, d = 1) => n == null ? "–" : Number(n).toLocaleString(undefined, { maximumFractionDigits: d });
+
+function aqiClass(v) { return v == null ? "" : v <= 50 ? "good" : v <= 100 ? "fair" : "poor"; }
+
+// 0..1 intensity per reading; drives the pulse line
+function intensities(r) {
+  const d = k => r[k] && r[k].data;
+  const out = [];
+  const w = d("weather"); if (w) out.push(["weather", Math.min(1, Math.abs((w.temperature_2m ?? 20) - 20) / 25 + (w.weather_code >= 61 ? .3 : 0))]);
+  const a = d("air"); if (a) out.push(["air", Math.min(1, (a.us_aqi ?? 0) / 200)]);
+  const q = d("quakes"); if (q) out.push(["quakes", Math.min(1, (q.max ?? 0) / 7)]);
+  const s = d("disasters"); if (s) out.push(["disasters", Math.min(1, s.n / 5)]);
+  const c = d("crime"); if (c && c.homicide_100k) out.push(["crime", Math.min(1, c.homicide_100k.v / 20)]);
+  const v = d("vaccines"); if (v && v.dtp3) out.push(["vaccines", Math.min(1, (100 - v.dtp3.v) / 50)]);
+  return out;
+}
+
+function pulseSVG(items) {
+  const W = 1000, H = 96, mid = 60, n = items.length || 1, seg = W / n;
+  let p = `M0 ${mid}`;
+  items.forEach(([, t], i) => {
+    const x = i * seg, h = 6 + t * 54;
+    p += ` L${x + seg * .35} ${mid} L${x + seg * .42} ${mid - h} L${x + seg * .5} ${mid + h * .45} L${x + seg * .56} ${mid} L${x + seg} ${mid}`;
+  });
+  const labels = items.map(([name]) => `<span>${name}</span>`).join("");
+  return `<svg class="pulse draw" viewBox="0 0 ${W} ${H - 16}" preserveAspectRatio="none" role="img" aria-label="Pulse line: taller spikes mean more notable readings">
+    <path class="base" d="M0 ${mid}H${W}"/><path class="trace" d="${p}"/></svg>
+    <div class="pulse-labels">${labels}</div>`;
+}
+
+function reading(k, entry, body) {
+  if (!entry || entry.data == null) {
+    return `<div class="reading na"><div class="k">${k}</div><div class="v">Unavailable right now</div></div>`;
+  }
+  const stale = entry.cache === "stale" ? ` <span class="stale">(last known)</span>` : "";
+  return `<div class="reading"><div class="k">${k}${stale}</div>${body(entry.data)}</div>`;
+}
+
+function render(j) {
+  const r = j.res, c = j.city;
+  const w = r.weather?.data, a = r.air?.data, co = r.country?.data;
+  const bits = [];
+  if (w) bits.push(`${esc(w.weather || "").toLowerCase()} at ${fmt(w.temperature_2m)}°C`);
+  if (a) bits.push(`air quality is ${esc((a.aqi_category || "").toLowerCase())}`);
+  const q = r.quakes?.data; if (q) bits.push(q.n ? `${q.n} earthquake${q.n > 1 ? "s" : ""} nearby this month` : "no earthquakes nearby this month");
+  const summary = bits.length ? bits.join(", ").replace(/^./, s => s.toUpperCase()) + "." : "";
+
+  const now = [
+    reading("Weather", r.weather, d => `<div class="v">${fmt(d.temperature_2m)}<small> °C</small></div><div class="d">${esc(d.weather)}, wind ${fmt(d.wind_speed_10m)} km/h</div>`),
+    reading("Air quality", r.air, d => `<div class="v">${fmt(d.us_aqi, 0)}<small> AQI</small><span class="chip ${aqiClass(d.us_aqi)}">${esc(d.aqi_category)}</span></div><div class="d">PM2.5 ${fmt(d.pm2_5)} µg/m³</div>`),
+  ];
+  const ground = [
+    reading("Earthquakes within 300 km, last 30 days", r.quakes, d => `<div class="v">${d.n}</div><div class="d">${d.n ? `Strongest magnitude ${fmt(d.max)}` : "None at magnitude 2.5 or above"}</div>`),
+    reading("Active natural events nearby", r.disasters, d => `<div class="v">${d.n}</div>${d.items.length ? `<ul>${d.items.map(x => `<li>${esc(x.t)} <span class="k">(${esc(x.cat)})</span></li>`).join("")}</ul>` : `<div class="d">Nothing reported by NASA EONET</div>`}`),
+  ];
+  const people = [
+    reading("Homicide rate, national", r.crime, d => d.homicide_100k
+      ? `<div class="v">${fmt(d.homicide_100k.v)}<small> per 100k</small></div><div class="d">${esc(d.homicide_100k.yr)} figure${d.local ? `. ${d.local.total} street-level reports nearby last month` : ""}</div>`
+      : `<div class="v">–</div><div class="d">No recent figure published</div>`),
+    reading("Currency", r.fx, d => d.per_usd != null
+      ? `<div class="v">${fmt(d.per_usd, 2)}<small> ${esc(d.cur)} per USD</small></div><div class="d">Rate from ${esc(d.date || "today")}</div>`
+      : `<div class="v">${esc(d.cur)}</div><div class="d">No exchange rate available</div>`),
+    reading("Childhood vaccination", r.vaccines, d => `<div class="v">${fmt(d.dtp3?.v, 0)}<small>% DTP3</small></div><div class="d">Measles first dose ${fmt(d.mcv1?.v, 0)}% (${esc(d.dtp3?.yr ?? "")})</div>`),
+  ];
+
+  $("#out").innerHTML = `
+    <section class="hero">
+      <h1>${esc(c.name)}</h1>
+      <p class="where">${esc(c.country)}${co ? `, ${esc(co.region.trim())}. ${esc(co.income)}` : ""}</p>
+      ${pulseSVG(intensities(r))}
+      <p class="summary">${summary}</p>
+    </section>
+    <section class="groups">
+      <div class="group"><h2>Right now</h2>${now.join("")}</div>
+      <div class="group"><h2>Ground and hazards</h2>${ground.join("")}</div>
+      <div class="group"><h2>People and money</h2>${people.join("")}</div>
+    </section>`;
+  document.title = `${c.name} – CityPulse`;
+}
+
+async function check(city, cc) {
+  const btn = $("#go");
+  btn.disabled = true; btn.textContent = "Checking…";
+  document.body.classList.add("loading");
+  const qs = cc ? `?country=${encodeURIComponent(cc)}` : "";
+  try {
+    const res = await fetch(`/city/${encodeURIComponent(city)}${qs}`);
+    const j = await res.json();
+    if (!res.ok) throw new Error(typeof j.detail === "string" ? j.detail : res.status === 422 ? "Country must be a two-letter code, like FR or US." : (j.err || "Request failed"));
+    render(j);
+    const u = new URL(location); u.searchParams.set("city", city); cc ? u.searchParams.set("country", cc) : u.searchParams.delete("country");
+    history.replaceState(null, "", u);
+  } catch (e) {
+    const msg = /not found/i.test(e.message) ? `No city called “${esc(city)}”${cc ? ` in ${esc(cc.toUpperCase())}` : ""}. Check the spelling${cc ? " or remove the country code" : ""}.` : esc(e.message);
+    $("#out").innerHTML = `<section class="empty"><p class="error">${msg}</p></section>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Check city";
+    document.body.classList.remove("loading");
+  }
+}
+
+$("#search").addEventListener("submit", e => {
+  e.preventDefault();
+  check($("#city").value.trim(), $("#country").value.trim());
+});
+document.querySelectorAll(".hint button").forEach(b => b.addEventListener("click", () => {
+  $("#city").value = b.dataset.c; $("#country").value = b.dataset.cc || "";
+  check(b.dataset.c, b.dataset.cc || "");
+}));
+const p = new URLSearchParams(location.search);
+if (p.get("city")) { $("#city").value = p.get("city"); $("#country").value = p.get("country") || ""; check(p.get("city"), p.get("country") || ""); }
+</script>
+</body>
+</html>

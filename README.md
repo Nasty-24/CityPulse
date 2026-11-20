@@ -25,7 +25,8 @@ Public data APIs are scattered, inconsistent, and flaky. CityPulse fans out to t
 - Human-readable labels: weather description and AQI category alongside the raw values
 - Exchange rates for ~160 currencies
 - Zero API keys
-- Auto generated docs at `/docs` (Swagger) and `/redoc`; `/` redirects there
+- Web dashboard at `/`: search a city and see every reading, with a pulse line that spikes on notable values
+- Auto generated docs at `/docs` (Swagger) and `/redoc`
 
 ## Quick start
 
@@ -45,7 +46,7 @@ curl localhost:8000/city/Tokyo
 curl "localhost:8000/city/Nairobi?src=weather&src=air"
 ```
 
-Interactive docs: http://localhost:8000/docs
+Dashboard: http://localhost:8000 | Interactive API docs: http://localhost:8000/docs
 
 ## API
 
@@ -142,8 +143,9 @@ create table c(k text primary key, exp real, val text)
 ## Project layout
 
 ```
-main.py     app, cache, fetchers, source registry, endpoint
-cache.db    created at runtime
+main.py            app, cache, fetchers, source registry, endpoints
+static/index.html  web dashboard served at /
+cache.db           created at runtime
 ```
 
 Adding a source takes 2 steps:

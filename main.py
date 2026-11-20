@@ -2,7 +2,8 @@ import asyncio, time
 from datetime import datetime, timedelta, timezone
 import httpx
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse, RedirectResponse
+from pathlib import Path
+from fastapi.responses import FileResponse, JSONResponse
 
 app = FastAPI(
     title="CityPulse",
@@ -11,9 +12,11 @@ app = FastAPI(
     version="0.1.0",
 )
 
+HERE = Path(__file__).parent
+
 @app.get("/", include_in_schema=False)
 async def home():
-    return RedirectResponse("/docs")
+    return FileResponse(HERE / "static" / "index.html")
 cl = httpx.AsyncClient(
     timeout=httpx.Timeout(15, connect=10),
     transport=httpx.AsyncHTTPTransport(retries=2, local_address="0.0.0.0"),
@@ -29,7 +32,7 @@ C, L = {}, {}
 
 import json, sqlite3
 
-db = sqlite3.connect("cache.db", check_same_thread=False)
+db = sqlite3.connect(HERE / "cache.db", check_same_thread=False)
 db.execute("pragma journal_mode=wal")
 db.execute("create table if not exists c(k text primary key, exp real, val text)")
 db.execute("delete from c where exp < ?", (time.time() - 7 * 86400,))
