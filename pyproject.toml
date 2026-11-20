@@ -1,7 +1,7 @@
 [project]
 name = "citypulse"
 version = "0.1.0"
-description = "One API call, one city, a full snapshot: weather, air quality, earthquakes, disasters, crime, currency and vaccination data from 8 free sources, normalized and cached."
+description = "One API call, one city, a full snapshot: weather, forecast, air quality, earthquakes, disasters, crime, currency and vaccination data from free public sources, scored and cached."
 readme = "README.md"
 authors = [
     { name = "Nasty-24", email = "briankibunja3@gmail.com" }

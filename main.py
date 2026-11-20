@@ -7,8 +7,8 @@ from fastapi.responses import FileResponse, JSONResponse
 
 app = FastAPI(
     title="CityPulse",
-    description="One request, one city, a full snapshot: weather, air quality, earthquakes, "
-                "disasters, crime, currency and vaccination data from 8 free sources.",
+    description="One request, one city, a full snapshot: weather, forecast, air quality, earthquakes, "
+                "disasters, crime, currency and vaccination data from free public sources.",
     version="0.1.0",
 )
 
@@ -196,6 +196,17 @@ def aqi_label(v):
         return None
     return next((name for hi, name in AQI if v <= hi), "Hazardous")
 
+async def fc(g):
+    j = await get("https://api.open-meteo.com/v1/forecast", latitude=g["latitude"], longitude=g["longitude"],
+                  daily="weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset",
+                  forecast_days=3, timezone="auto")
+    d = j["daily"]
+    days = [{"date": d["time"][i], "high": d["temperature_2m_max"][i], "low": d["temperature_2m_min"][i],
+             "rain_chance": d["precipitation_probability_max"][i],
+             "weather": WMO.get(d["weather_code"][i], "Unknown")} for i in range(len(d["time"]))]
+    return {"days": days, "sunrise": d["sunrise"][0][-5:], "sunset": d["sunset"][0][-5:],
+            "timezone": j["timezone"], "utc_offset_seconds": j["utc_offset_seconds"]}
+
 async def aq(g):
     j = await get("https://air-quality-api.open-meteo.com/v1/air-quality", latitude=g["latitude"],
                   longitude=g["longitude"], current="us_aqi,pm2_5")
@@ -256,6 +267,7 @@ def pulse_score(res):
 
 S = {
     "weather": (600, wx, "city"),
+    "forecast": (3600, fc, "city"),
     "air": (1800, aq, "city"),
     "quakes": (3600, eq, "city"),
     "disasters": (1800, ds, "city"),
@@ -305,8 +317,13 @@ async def snapshot(name, cc, want):
             return s, {"data": None, "err": f"{type(e).__name__}: {e}"}
 
     res = dict(await asyncio.gather(*(one(s) for s in want)))
-    return {"city": {k: g.get(k) for k in ("name", "country", "latitude", "longitude")},
-            "pulse": pulse_score(res), "res": res}
+    info = {k: g.get(k) for k in ("name", "country", "latitude", "longitude", "population", "elevation", "timezone")}
+    # local time is computed per request, so it stays correct even when the forecast is cached
+    off = (res.get("forecast") or {}).get("data", {}) or {}
+    if "utc_offset_seconds" in off:
+        t = datetime.now(timezone.utc) + timedelta(seconds=off["utc_offset_seconds"])
+        info["local_time"] = t.strftime("%Y-%m-%dT%H:%M")
+    return {"city": info, "pulse": pulse_score(res), "res": res}
 
 @app.get("/compare")
 async def compare(

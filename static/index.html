@@ -109,6 +109,11 @@ form.search { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.5rem 0 0; }
 .good { color: var(--good); } .fair { color: var(--fair); } .poor { color: var(--poor); }
 .reading ul { margin: .35rem 0 0; padding-left: 1.1rem; font-size: .95rem; }
 .stale { color: var(--fair); font-size: .85rem; }
+table.days { border-collapse: collapse; margin: .35rem 0 .5rem; font-variant-numeric: tabular-nums; }
+.days th, .days td { text-align: left; padding: .3rem 1rem .3rem 0; font-size: .95rem; vertical-align: baseline; }
+.days th { font-weight: 400; color: var(--muted); }
+.days td:nth-child(2) { font: 600 1.15rem var(--display); white-space: nowrap; }
+.days small { color: var(--muted); font: 400 .9rem var(--body); }
 
 /* compare */
 form.vs { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: 1.5rem 0 0; }
@@ -160,7 +165,7 @@ footer { color: var(--muted); font-size: .9rem; border-top: 1px solid var(--line
   <main id="out">
     <section class="empty">
       <h1>How is your city doing right now?</h1>
-      <p>Type a city to see its weather, air quality, recent earthquakes and disasters, crime rate, currency and vaccination coverage, gathered live from 8 public sources.</p>
+      <p>Type a city to see its weather and 3-day forecast, air quality, recent earthquakes and disasters, crime rate, currency and vaccination coverage, gathered live from free public sources.</p>
     </section>
   </main>
 
@@ -200,6 +205,12 @@ function pulseSVG(items) {
     <div class="pulse-labels">${labels}</div>`;
 }
 
+function dayName(iso, i) {
+  if (i === 0) return "Today";
+  if (i === 1) return "Tomorrow";
+  return new Date(iso + "T12:00:00").toLocaleDateString(undefined, { weekday: "long" });
+}
+
 const PART_NAMES = { air: "Air quality", crime: "Safety", weather: "Weather comfort", quakes: "Earthquakes", vaccines: "Vaccination", disasters: "Natural events" };
 function gradeClass(s) { return s >= 60 ? "good" : s >= 40 ? "fair" : "poor"; }
 
@@ -236,6 +247,8 @@ function render(j) {
   const now = [
     reading("Weather", r.weather, d => `<div class="v">${fmt(d.temperature_2m)}<small> °C</small></div><div class="d">${esc(d.weather)}, wind ${fmt(d.wind_speed_10m)} km/h</div>`),
     reading("Air quality", r.air, d => `<div class="v">${fmt(d.us_aqi, 0)}<small> AQI</small><span class="chip ${aqiClass(d.us_aqi)}">${esc(d.aqi_category)}</span></div><div class="d">PM2.5 ${fmt(d.pm2_5)} µg/m³</div>`),
+    reading("Next 3 days", r.forecast, d => `<table class="days">${d.days.map((x, i) => `<tr><th>${dayName(x.date, i)}</th><td>${fmt(x.high, 0)}° <small>/ ${fmt(x.low, 0)}°</small></td><td>${esc(x.weather)}${x.rain_chance != null ? `<small>, ${x.rain_chance}% rain</small>` : ""}</td></tr>`).join("")}</table>
+      <div class="d">Sunrise ${esc(d.sunrise)}, sunset ${esc(d.sunset)} local time</div>`),
   ];
   const ground = [
     reading("Earthquakes within 300 km, last 30 days", r.quakes, d => `<div class="v">${d.n}</div><div class="d">${d.n ? `Strongest magnitude ${fmt(d.max)}` : "None at magnitude 2.5 or above"}</div>`),
@@ -257,6 +270,11 @@ function render(j) {
         <div>
           <h1>${esc(c.name)}</h1>
           <p class="where">${esc(c.country)}${co ? `, ${esc(co.region.trim())}. ${esc(co.income)}` : ""}</p>
+          <p class="where">${[
+            c.local_time && `Local time ${esc(c.local_time.slice(11))}`,
+            c.population && `${fmt(c.population, 0)} people`,
+            c.elevation != null && `${fmt(c.elevation, 0)} m above sea level`,
+          ].filter(Boolean).join(". ")}</p>
         </div>
         ${scoreBlock(j.pulse)}
       </div>
@@ -284,6 +302,9 @@ function render(j) {
 
 // rows for the compare table: label, value getter, display, which direction is better
 const ROWS = [
+  ["Local time", (r, c) => c.local_time, v => esc(v.slice(11)), null],
+  ["Population", (r, c) => c.population, v => fmt(v, 0), null],
+  ["Tomorrow", r => r.forecast?.data?.days?.[1]?.high, (v, r) => `${fmt(v, 0)}° <small>${esc(r.forecast.data.days[1].weather)}, ${r.forecast.data.days[1].rain_chance ?? "–"}% rain</small>`, null],
   ["Air quality (AQI)", r => r.air?.data?.us_aqi, (v, r) => `${fmt(v, 0)} <small>${esc(r.air.data.aqi_category)}</small>`, "low"],
   ["Temperature", r => r.weather?.data?.temperature_2m, (v, r) => `${fmt(v)}°C <small>${esc(r.weather.data.weather)}</small>`, null],
   ["Strongest quake nearby, 30 days", r => r.quakes?.data ? (r.quakes.data.max ?? 0) : undefined, (v, r) => r.quakes.data.n ? `M${fmt(v)} <small>${r.quakes.data.n} quakes</small>` : "None", "low"],
@@ -301,7 +322,7 @@ function renderCompare(j) {
   const scores = ok.map(c => c.pulse?.score);
   const bestScore = Math.max(...scores.filter(s => s != null));
   const body = ROWS.map(([label, get, show, dir]) => {
-    const vals = ok.map(c => get(c.res));
+    const vals = ok.map(c => get(c.res, c.city));
     const known = vals.filter(v => v != null);
     const best = dir && known.length > 1 && new Set(known).size > 1 ? (dir === "low" ? Math.min(...known) : Math.max(...known)) : null;
     return `<tr><th scope="row">${label}</th>${vals.map((v, i) => v == null ? cell("", "–") : cell(v === best ? "best" : "", show(v, ok[i].res))).join("")}</tr>`;

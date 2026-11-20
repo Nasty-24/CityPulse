@@ -1,6 +1,6 @@
 # CityPulse
 
-One request, one city, a full snapshot: weather, air quality, earthquakes, natural disasters, crime, currency vs USD, and vaccination coverage. Built with FastAPI. No API keys needed.
+One request, one city, a full snapshot: weather and forecast, air quality, earthquakes, natural disasters, crime, currency vs USD, and vaccination coverage. Built with FastAPI. No API keys needed.
 
 ```
 GET /city/Tokyo
@@ -14,7 +14,7 @@ Public data APIs are scattered, inconsistent, and flaky. CityPulse fans out to t
 
 ## Features
 
-- 8 data sources behind one endpoint
+- 9 data sources behind one endpoint, including a 3-day forecast with sunrise and sunset
 - Pick only the sources you need with `?src=`
 - Independent cache per source, each with its own TTL
 - Two tier cache: in-memory (L1) over SQLite (L2), survives restarts
@@ -22,6 +22,7 @@ Public data APIs are scattered, inconsistent, and flaky. CityPulse fans out to t
 - Per-key locking: concurrent identical requests cause one upstream call
 - Partial results: a failed source returns `data: null` plus an error, the rest still come back
 - Disambiguate cities with `?country=` (ISO2 code, e.g. `FR`, `US`)
+- City facts with no extra calls: population, elevation, timezone and current local time
 - Human-readable labels: weather description and AQI category alongside the raw values
 - Exchange rates for ~160 currencies
 - Zero API keys
@@ -57,7 +58,7 @@ Dashboard: http://localhost:8000 | Interactive API docs: http://localhost:8000/d
 | Param  | In    | Required | Description                                                      |
 |--------|-------|----------|------------------------------------------------------------------|
 | `name`    | path  | yes      | City name. The first geocoding match is used.                    |
-| `src`     | query | no       | Repeatable. One of `weather`, `air`, `quakes`, `disasters`, `crime`, `country`, `fx`, `vaccines`. Omitted means all of them.|
+| `src`     | query | no       | Repeatable. One of `weather`, `forecast`, `air`, `quakes`, `disasters`, `crime`, `country`, `fx`, `vaccines`. Omitted means all of them.|
 | `country` | query | no       | ISO 3166-1 alpha-2 code. Restricts the city lookup to that country, e.g. `?country=US` for Paris, Texas. |
 
 Errors:
@@ -95,7 +96,11 @@ The dashboard has the same view: open a city and use "Compare with", or go to `/
     "name": "Tokyo",
     "country": "Japan",
     "latitude": 35.6895,
-    "longitude": 139.69171
+    "longitude": 139.69171,
+    "population": 8336599,
+    "elevation": 44.0,
+    "timezone": "Asia/Tokyo",
+    "local_time": "2026-11-21T06:30"
   },
   "res": {
     "weather": {
