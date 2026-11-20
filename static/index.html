@@ -136,6 +136,62 @@ table.cmp { border-collapse: collapse; width: 100%; min-width: 34rem; font-varia
 .cmp .rank td, .cmp .rank th { border-bottom: 2px solid var(--ink); }
 .cmp-errors { color: var(--poor); }
 
+/* trip planner */
+.search select, .plan select {
+  font: inherit; color: var(--ink); background: var(--raised);
+  border: 1px solid var(--line); border-radius: 6px; padding: .7rem .6rem;
+}
+.search select { flex: 0 0 8.5rem; }
+.plan { padding: 3rem 0 2rem; }
+.plan h1 { font: 800 clamp(2.4rem, 8vw, 5rem)/1 var(--display); letter-spacing: -0.035em; margin: 0; }
+.plan h1 select { font: inherit; letter-spacing: inherit; color: var(--pulse); background: none; border: 0; border-bottom: 4px solid var(--pulse); border-radius: 0; padding: 0 .1em; cursor: pointer; }
+.plan p { max-width: 40rem; color: var(--muted); font-size: 1.15rem; }
+.plan .go { font: 600 1.05rem var(--body); color: var(--paper); background: var(--ink); border: 0; border-radius: 6px; padding: .8rem 1.4rem; cursor: pointer; }
+.month-line { color: var(--muted); font-size: 1.15rem; margin: .6rem 0 0; }
+.month-line select { font: 600 1.05rem var(--body); padding: .2rem .4rem; }
+.book { margin: 2rem 0 0; padding: 1.25rem 0 .5rem; border-top: 2px solid var(--ink); }
+.book h2, .section h2 { font: 600 1.35rem/1.2 var(--display); margin: 0 0 .75rem; }
+.book ul { margin: 0; padding: 0; list-style: none; max-width: 48rem; }
+.book li { padding: .55rem 0 .55rem 1.6rem; border-bottom: 1px solid var(--line); position: relative; }
+.book li::before { content: "!"; position: absolute; left: 0; top: .5rem; width: 1.15rem; height: 1.15rem; border-radius: 50%; background: var(--fair); color: var(--paper); font: 800 .8rem/1.15rem var(--display); text-align: center; }
+.book .none { color: var(--good); }
+.section { padding: 2.25rem 0 0; }
+.climate-stats { display: flex; flex-wrap: wrap; gap: 1.25rem 2.5rem; margin: 0 0 1.25rem; }
+.climate-stats div { min-width: 7rem; }
+.climate-stats .v { font: 600 2rem/1.1 var(--display); letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+.climate-stats .v small { font: 400 1rem var(--body); color: var(--muted); }
+.climate-stats .k { color: var(--muted); font-size: .95rem; }
+.months { display: grid; grid-template-columns: repeat(12, 1fr); gap: .3rem; align-items: end; height: 9rem; max-width: 48rem; }
+.months button { all: unset; cursor: pointer; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; font-size: .75rem; color: var(--muted); }
+.months .bar { width: 100%; max-width: 2.6rem; background: var(--line); border-radius: 3px 3px 0 0; }
+.months .best .bar { background: color-mix(in srgb, var(--good) 55%, var(--line)); }
+.months .on .bar { background: var(--pulse); }
+.months .on { color: var(--ink); font-weight: 600; }
+.months .t { margin: .2rem 0 .15rem; font-variant-numeric: tabular-nums; }
+.months button:focus-visible .bar { outline: 3px solid var(--pulse); outline-offset: 2px; }
+.chart-note { color: var(--muted); font-size: .9rem; margin: .5rem 0 0; }
+.src { color: var(--muted); font-size: .8rem; }
+.src a { color: inherit; }
+.live-head { padding: 3rem 0 0; border-bottom: 2px solid var(--ink); }
+.live-head h2 { font: 600 1.35rem/1.2 var(--display); margin: 0 0 .5rem; }
+.live-head p { color: var(--muted); margin: 0 0 .75rem; }
+
+/* destinations */
+ol.dest { list-style: none; margin: 1.5rem 0 3rem; padding: 0; counter-reset: d; }
+.dest li { counter-increment: d; display: grid; grid-template-columns: 2.5rem 1fr auto; gap: .25rem 1rem; padding: 1rem 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.dest li::before { content: counter(d); font: 800 1.4rem var(--display); color: var(--muted); }
+.dest .name { font: 800 1.6rem/1.1 var(--display); letter-spacing: -0.02em; }
+.dest .name button { all: unset; cursor: pointer; }
+.dest .name button:hover { text-decoration: underline; }
+.dest .name button:focus-visible { outline: 3px solid var(--pulse); outline-offset: 2px; }
+.dest .name small { font: 400 1rem var(--body); color: var(--muted); letter-spacing: 0; margin-left: .35rem; }
+.dest .sc { font: 800 1.8rem/1 var(--display); text-align: right; font-variant-numeric: tabular-nums; }
+.dest .sc small { display: block; font: 600 .85rem var(--body); }
+.dest .info { grid-column: 2 / 4; color: var(--muted); font-size: .95rem; }
+.dest .warn { grid-column: 2 / 4; font-size: .95rem; }
+.dest .incomplete { grid-column: 2 / 4; color: var(--fair); font-size: .9rem; }
+.wait { color: var(--muted); }
+
 /* states */
 .empty { padding: 3rem 0 4rem; max-width: 36rem; }
 .empty h1 { font: 800 clamp(2.5rem, 8vw, 4.5rem)/1 var(--display); letter-spacing: -0.03em; margin: 0 0 1rem; }
@@ -158,18 +214,14 @@ footer { color: var(--muted); font-size: .9rem; border-top: 1px solid var(--line
     <label class="sr" for="city" hidden>City</label>
     <input id="city" name="city" placeholder="Search a city, e.g. Nairobi" autocomplete="off" required aria-label="City">
     <input id="country" name="country" placeholder="Country" maxlength="2" aria-label="Country code, optional" title="Optional two-letter country code, e.g. FR">
-    <button type="submit" id="go">Check city</button>
+    <select id="month" aria-label="Travel month"></select>
+    <button type="submit" id="go">Plan trip</button>
   </form>
-  <p class="hint">Try <button data-c="Nairobi">Nairobi</button>, <button data-c="Tokyo">Tokyo</button>, <button data-c="Paris" data-cc="US">Paris, US</button> or <button data-c="London">London</button>.</p>
+  <p class="hint">Try <button data-c="Lisbon">Lisbon</button>, <button data-c="Bangkok">Bangkok</button>, <button data-c="Mombasa">Mombasa</button> or <button data-c="Reykjavik">Reykjavik</button>.</p>
 
-  <main id="out">
-    <section class="empty">
-      <h1>How is your city doing right now?</h1>
-      <p>Type a city to see its weather and 3-day forecast, air quality, recent earthquakes and disasters, crime rate, currency and vaccination coverage, gathered live from free public sources.</p>
-    </section>
-  </main>
+  <main id="out"></main>
 
-  <footer>Data from Open-Meteo, USGS, NASA EONET, World Bank, UK Police, ExchangeRate-API and WHO. Readings are cached for up to a day per source.</footer>
+  <footer>Data from Open-Meteo, WHO, UK FCDO travel advice, GDACS, World Bank, USGS, NASA EONET, UK Police, Nager.Date and ExchangeRate-API. <a href="https://github.com/Nasty-24/CityPulse/blob/main/docs/TRAVEL_DATA.md">What we check and where it comes from</a>. Scores are a guide, not advice: always read official travel advice before booking.</footer>
 </div>
 
 <script>
@@ -235,7 +287,7 @@ function reading(k, entry, body) {
   return `<div class="reading"><div class="k">${k}${stale}</div>${body(entry.data)}</div>`;
 }
 
-function render(j) {
+function liveHTML(j) {
   const r = j.res, c = j.city;
   const w = r.weather?.data, a = r.air?.data, co = r.country?.data;
   const bits = [];
@@ -264,40 +316,198 @@ function render(j) {
     reading("Childhood vaccination", r.vaccines, d => `<div class="v">${fmt(d.dtp3?.v, 0)}<small>% DTP3</small></div><div class="d">Measles first dose ${fmt(d.mcv1?.v, 0)}% (${esc(d.dtp3?.yr ?? "")})</div>`),
   ];
 
-  $("#out").innerHTML = `
-    <section class="hero">
-      <div class="hero-top">
-        <div>
-          <h1>${esc(c.name)}</h1>
-          <p class="where">${esc(c.country)}${co ? `, ${esc(co.region.trim())}. ${esc(co.income)}` : ""}</p>
-          <p class="where">${[
-            c.local_time && `Local time ${esc(c.local_time.slice(11))}`,
-            c.population && `${fmt(c.population, 0)} people`,
-            c.elevation != null && `${fmt(c.elevation, 0)} m above sea level`,
-          ].filter(Boolean).join(". ")}</p>
-        </div>
-        ${scoreBlock(j.pulse)}
-      </div>
-      ${pulseSVG(intensities(r))}
-      <p class="summary">${summary}</p>
-      <form class="vs" id="vs">
-        <label for="vs-city">Compare ${esc(c.name)} with</label>
-        <input id="vs-city" placeholder="Another city, e.g. Kampala" required>
-        <button type="submit">Compare</button>
-      </form>
-    </section>
+  return `
+    <div class="live-head">
+      <h2>${esc(c.name)} right now</h2>
+      <p>${c.local_time ? `Local time ${esc(c.local_time.slice(11))}. ` : ""}Live conditions for travellers already booked.${j.pulse ? ` Pulse score today: ${j.pulse.score}/100, ${esc(j.pulse.grade.toLowerCase())}.` : ""}</p>
+    </div>
+    ${pulseSVG(intensities(r))}
+    <p class="summary">${summary}</p>
     <section class="groups">
-      <div class="group"><h2>Right now</h2>${now.join("")}</div>
+      <div class="group"><h2>Weather and air</h2>${now.join("")}</div>
       <div class="group"><h2>Ground and hazards</h2>${ground.join("")}</div>
       <div class="group"><h2>People and money</h2>${people.join("")}</div>
-    </section>`;
-  document.title = `${c.name} – CityPulse`;
+    </section>
+    <form class="vs" id="vs">
+      <label for="vs-city">Compare ${esc(c.name)} with</label>
+      <input id="vs-city" placeholder="Another city, e.g. Kampala" required>
+      <button type="submit">Compare</button>
+    </form>`;
+}
+
+function wireCompare() {
   const here = $("#country").value.trim();
-  $("#vs").addEventListener("submit", e => {
+  $("#vs")?.addEventListener("submit", e => {
     e.preventDefault();
     const other = $("#vs-city").value.trim();
     go({ compare: [here ? `${$("#city").value.trim()},${here}` : $("#city").value.trim(), other] });
   });
+}
+
+/* ---------------- trip planner ---------------- */
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const nextMonth = () => (new Date().getMonth() + 1) % 12 + 1;
+const monthOptions = sel => MONTHS.map((m, i) => `<option value="${i + 1}"${i + 1 === sel ? " selected" : ""}>${m}</option>`).join("");
+const TRIP_PARTS = { climate: "Weather that month", safety: "Safety", health: "Health", hazards: "Natural hazards" };
+
+function tripScoreBlock(t) {
+  if (!t) return "";
+  const rows = Object.entries(t.parts).map(([k, v]) => `<tr><td>${TRIP_PARTS[k] || k}</td><td>${v}</td></tr>`).join("");
+  return `<div class="score" aria-label="Trip score ${t.score} out of 100, ${esc(t.grade)}">
+    <div class="n">${t.score}<small> /100</small></div>
+    <div class="g ${t.score >= 65 ? "good" : t.score >= 50 ? "fair" : "poor"}">${esc(t.grade)}</div>
+    <details><summary>How this is scored</summary>
+      <table>${rows}</table>
+      <p>Weather 40%, safety 30%, health 18%, hazards 12%. Official "avoid all travel" warnings and bad weather cap the score. Based on ${esc(t.based_on)}.</p>
+    </details>
+  </div>`;
+}
+
+const val = (f, d = 1, unit = "") => f && f.v != null ? `${fmt(f.v, d)}${unit}` : "–";
+const yr = f => f && f.yr ? ` (${esc(f.yr)})` : "";
+const src = f => f && f.source ? `<div class="src">${esc(f.source)}</div>` : "";
+
+function item(k, v, d, source) {
+  return `<div class="reading"><div class="k">${k}</div><div class="v">${v}</div>${d ? `<div class="d">${d}</div>` : ""}${source || ""}</div>`;
+}
+
+function monthChart(byMonth, month, best) {
+  if (!byMonth) return "";
+  const bestSet = new Set(best.map(b => b.month));
+  // scale bars to this city's own range so the good and bad months stand apart
+  const scores = byMonth.map(n => n.score).filter(s => s != null);
+  const lo = Math.min(...scores) - 10, hi = Math.max(...scores);
+  const height = s => s == null ? 4 : Math.max(6, (s - lo) / Math.max(1, hi - lo) * 100);
+  return `<div class="months" role="group" aria-label="Weather score by month. Choose a month to plan for it.">${byMonth.map(n => `
+    <button type="button" data-m="${n.month}" class="${n.month === month ? "on" : ""} ${bestSet.has(n.month) ? "best" : ""}"
+      aria-label="${MONTHS[n.month - 1]}: weather score ${n.score ?? "unknown"}, average high ${fmt(n.avg_high, 0)} degrees, ${fmt(n.rainy_days, 0)} rainy days${bestSet.has(n.month) ? ", one of the best months" : ""}"
+      aria-pressed="${n.month === month}">
+      <span class="t">${fmt(n.avg_high, 0)}°</span>
+      <span class="bar" style="height:${height(n.score)}%"></span>
+      <span>${MONTHS[n.month - 1].slice(0, 3)}</span>
+    </button>`).join("")}</div>
+    <p class="chart-note">Taller bars mean better holiday weather that month, compared with the rest of this city's year. Numbers are the average afternoon high. Green bars are the best months. Choose a bar to switch month.</p>`;
+}
+
+function renderTrip(t) {
+  const c = t.city, cl = t.climate, s = t.safety || {}, h = t.health || {}, hz = t.hazards, money = t.costs || {}, pr = t.practical || {};
+  const adv = s.advisory;
+  const out = h.outbreaks;
+  const cautions = t.cautions.length
+    ? `<ul>${t.cautions.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`
+    : `<p class="none">Nothing flagged for ${esc(t.month_name)}. Still read the official travel advice before you book.</p>`;
+  const best = t.best_months.map(b => b.name).join(", ");
+
+  const safety = [
+    adv ? item("UK government travel advice", esc(adv.label), adv.latest_change ? esc(adv.latest_change) : "",
+      `<div class="src">${esc(adv.source)}${adv.url ? `, <a href="${esc(adv.url)}" target="_blank" rel="noopener">read the full advice</a>` : ""}${adv.updated ? `, updated ${esc(adv.updated)}` : ""}</div>`) : "",
+    item("Homicides per 100,000 people", val(s.homicide_100k), `National figure${yr(s.homicide_100k)}`, src(s.homicide_100k)),
+    item("Road deaths per 100,000 people", val(s.road_deaths_100k), `${yr(s.road_deaths_100k)}`, src(s.road_deaths_100k)),
+    item("Political stability", val(s.political_stability, 2), `From about −2.5 (unstable) to +2.5 (stable)${yr(s.political_stability)}`, src(s.political_stability)),
+  ];
+  const health = [
+    item("Disease outbreaks, last 12 months", out ? out.country.length : "–",
+      out && out.country.length ? `<ul>${out.country.map(o => `<li><a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.title)}</a> <span class="k">${esc(o.date)}</span></li>`).join("")}</ul>` : "No WHO outbreak reports name this country",
+      out ? `<div class="src">${esc(out.source)}</div>` : ""),
+    out && out.worldwide.length ? item("Worldwide health alerts", out.worldwide.length, `<ul>${out.worldwide.map(o => `<li><a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.title)}</a> <span class="k">${esc(o.date)}</span></li>`).join("")}</ul>`, `<div class="src">${esc(out.source)}</div>`) : "",
+    item("Malaria cases per 1,000 at risk", val(h.malaria_per_1000), h.malaria_per_1000?.v ? "Ask a travel clinic about prevention" : "No local transmission reported", src(h.malaria_per_1000)),
+    item("Basic drinking water", val(h.basic_water_pct, 0, "%"), "Share of people with basic access", src(h.basic_water_pct)),
+    item("Doctors per 1,000 people", val(h.physicians_per_1000), "", src(h.physicians_per_1000)),
+  ];
+  const hazards = hz ? [
+    item("Disaster alerts, last 90 days", hz.events.length,
+      hz.events.length ? `<ul>${hz.events.slice(0, 6).map(e => `<li><span class="${e.alert === "Red" ? "poor" : e.alert === "Orange" ? "fair" : "good"}">${esc(e.alert)}</span> ${esc(e.type.toLowerCase())}: ${esc(e.name)} <span class="k">since ${esc(e.from)}</span></li>`).join("")}</ul>` : "No alerts for this country",
+      `<div class="src">${esc(hz.source)}</div>`),
+  ] : [item("Disaster alerts", "–", "Unavailable right now")];
+  const practical = [
+    item("Price level for visitors", money.price_level ? esc(money.price_level.label) : "–", money.price_level ? `${fmt(money.price_level.v, 2)} times US prices${yr(money.price_level)}` : "", src(money.price_level)),
+    item("International visitors a year", val(money.tourist_arrivals, 0), `${yr(money.tourist_arrivals)}`, src(money.tourist_arrivals)),
+    item(`Public holidays in ${esc(t.month_name)}`, pr.holidays_in_month ? pr.holidays_in_month.length : "–",
+      pr.holidays_in_month?.length ? `<ul>${pr.holidays_in_month.map(x => `<li>${esc(x.name)} <span class="k">${esc(x.date)}</span></li>`).join("")}</ul>` : pr.holidays_in_month ? "None" : "Not available for this country",
+      `<div class="src">${esc(pr.holidays_source)}</div>`),
+    item("Languages", pr.languages?.length ? esc(pr.languages.join(", ")) : "–", "", `<div class="src">Unicode CLDR</div>`),
+    item("Elevation", c.elevation != null ? `${fmt(c.elevation, 0)}<small> m</small>` : "–", c.elevation >= 2500 ? "High altitude: allow time to acclimatise" : "", ""),
+  ];
+
+  return `
+    <section class="hero">
+      <div class="hero-top">
+        <div>
+          <h1>${esc(c.name)}</h1>
+          <p class="where">${esc(c.country)}${c.population ? `. ${fmt(c.population, 0)} people` : ""}</p>
+          <p class="month-line"><label for="trip-month">Travelling in</label> <select id="trip-month">${monthOptions(t.month)}</select></p>
+        </div>
+        ${tripScoreBlock(t.trip)}
+      </div>
+      ${best ? `<p class="summary">Best weather for a holiday: ${esc(best)}.</p>` : ""}
+    </section>
+    <section class="book"><h2>Before you book</h2>${cautions}</section>
+    <section class="section">
+      <h2>${esc(t.month_name)} in ${esc(c.name)}</h2>
+      ${cl ? `<div class="climate-stats">
+        <div><div class="v">${fmt(cl.avg_high, 0)}°<small> / ${fmt(cl.avg_low, 0)}°</small></div><div class="k">Average high and low</div></div>
+        <div><div class="v">${fmt(cl.rainy_days, 0)}<small> days</small></div><div class="k">With rain, ${fmt(cl.rain_mm, 0)} mm in total</div></div>
+        <div><div class="v">${fmt(cl.sunshine_hours, 1)}<small> h</small></div><div class="k">Sunshine a day</div></div>
+        <div><div class="v">${fmt(cl.humidity, 0)}<small>%</small></div><div class="k">Humidity</div></div>
+        <div><div class="v">${fmt(cl.daylight_hours, 1)}<small> h</small></div><div class="k">Daylight</div></div>
+      </div>
+      ${monthChart(t.climate_by_month, t.month, t.best_months)}
+      <div class="src">${esc(cl.source)}, averages for ${esc(cl.years)}</div>` : `<p class="error">Climate data is unavailable right now. Try again in a minute.</p>`}
+    </section>
+    <section class="groups">
+      <div class="group"><h2>Safety</h2>${safety.join("")}</div>
+      <div class="group"><h2>Health</h2>${health.join("")}</div>
+      <div class="group"><h2>Hazards, money and practical</h2>${hazards.join("")}${practical.join("")}</div>
+    </section>
+    <div id="live"><p class="wait">Loading live conditions…</p></div>`;
+}
+
+function renderDestinations(j) {
+  const list = j.destinations.map(d => {
+    const t = d.trip, c = d.climate;
+    return `<li>
+      <div class="name"><button type="button" data-city="${esc(d.name)}" data-cc="${esc(d.country_code)}">${esc(d.name)}</button><small>${esc(d.country)}</small></div>
+      <div class="sc ${t.score >= 65 ? "good" : t.score >= 50 ? "fair" : "poor"}">${t.score}<small>${esc(t.grade)}</small></div>
+      <div class="info">${c.avg_high != null ? `${fmt(c.avg_high, 0)}° highs, ${fmt(c.rainy_days, 0)} rainy days, ${fmt(c.sunshine_hours, 0)} h sun a day. ` : ""}${d.price_level ? `${esc(d.price_level)}. ` : ""}Best months: ${esc(d.best_months.join(", ") || "unknown")}.</div>
+      ${d.top_caution ? `<div class="warn">${esc(d.top_caution)}</div>` : ""}
+      ${d.complete ? "" : `<div class="incomplete">Weather data missing, so this ranks below complete results.</div>`}
+    </li>`;
+  }).join("");
+  $("#out").innerHTML = `
+    <section class="plan">
+      <h1>Where to go in <select id="dest-month" aria-label="Month">${monthOptions(j.month)}</select></h1>
+      <p>${j.destinations.length} popular destinations ranked by weather that month, safety, health and natural hazards. Choose a city for the full picture.</p>
+    </section>
+    <ol class="dest">${list}</ol>`;
+  document.title = `Where to go in ${j.month_name} – CityPulse`;
+  $("#dest-month").addEventListener("change", e => go({ where: true, month: +e.target.value }));
+  document.querySelectorAll(".dest .name button").forEach(b => b.addEventListener("click", () => {
+    $("#city").value = b.dataset.city; $("#country").value = b.dataset.cc;
+    go({ city: b.dataset.city, cc: b.dataset.cc, month: j.month });
+  }));
+}
+
+function renderHome(month) {
+  $("#out").innerHTML = `
+    <section class="plan">
+      <h1>Where should you go in <select id="home-month" aria-label="Month">${monthOptions(month)}</select>?</h1>
+      <p>CityPulse ranks holiday destinations by the weather you can expect that month, official travel warnings, crime, disease outbreaks and natural disasters, all from public sources. Or search any city above to plan a trip there.</p>
+      <button class="go" id="find">Find destinations</button>
+    </section>`;
+  $("#find").addEventListener("click", () => go({ where: true, month: +$("#home-month").value }));
+}
+
+async function showDestinations(month) {
+  $("#out").innerHTML = `<section class="plan"><h1>Where to go in ${MONTHS[month - 1]}</h1><p class="wait">Checking weather, safety and health for 30 destinations. The first search after the app starts can take a minute or two; later ones are quick.</p></section>`;
+  try {
+    const res = await fetch(`/destinations?month=${month}&limit=30`);
+    const j = await res.json();
+    if (!res.ok) throw new Error(typeof j.detail === "string" ? j.detail : "Request failed");
+    renderDestinations(j);
+  } catch (e) {
+    $("#out").innerHTML = `<section class="empty"><p class="error">Could not rank destinations: ${esc(e.message)}. Try again in a minute.</p></section>`;
+  }
 }
 
 // rows for the compare table: label, value getter, display, which direction is better
@@ -346,9 +556,15 @@ function renderCompare(j) {
 function go(state) {
   const u = new URL(location.pathname, location.origin);
   if (state.compare) state.compare.forEach(c => u.searchParams.append("compare", c));
-  else { u.searchParams.set("city", state.city); if (state.cc) u.searchParams.set("country", state.cc); }
+  else if (state.where) { u.searchParams.set("where", "1"); u.searchParams.set("month", state.month); }
+  else {
+    u.searchParams.set("city", state.city);
+    if (state.cc) u.searchParams.set("country", state.cc);
+    if (state.month) u.searchParams.set("month", state.month);
+  }
   history.pushState(null, "", u);
   route();
+  window.scrollTo(0, 0);
 }
 
 async function compareCities(list) {
@@ -365,40 +581,59 @@ async function compareCities(list) {
   } finally { btn.disabled = false; }
 }
 
-async function check(city, cc) {
+async function getJSON(url) {
+  const res = await fetch(url);
+  const j = await res.json();
+  if (!res.ok) throw new Error(typeof j.detail === "string" ? j.detail : res.status === 422 ? "Country must be a two-letter code, like FR or US." : "Request failed");
+  return j;
+}
+
+async function check(city, cc, month) {
   const btn = $("#go");
-  btn.disabled = true; btn.textContent = "Checking…";
-  document.body.classList.add("loading");
-  const qs = cc ? `?country=${encodeURIComponent(cc)}` : "";
+  btn.disabled = true; btn.textContent = "Planning…";
+  $("#out").innerHTML = `<section class="hero"><h1>${esc(city)}</h1><p class="wait">Checking weather for ${MONTHS[month - 1]}, travel advice, health and hazards…</p></section>`;
+  const qs = cc ? `&country=${encodeURIComponent(cc)}` : "";
+  const live = getJSON(`/city/${encodeURIComponent(city)}?${qs.slice(1)}`);  // in parallel
   try {
-    const res = await fetch(`/city/${encodeURIComponent(city)}${qs}`);
-    const j = await res.json();
-    if (!res.ok) throw new Error(typeof j.detail === "string" ? j.detail : res.status === 422 ? "Country must be a two-letter code, like FR or US." : (j.err || "Request failed"));
-    render(j);
+    const t = await getJSON(`/trip/${encodeURIComponent(city)}?month=${month}${qs}`);
+    $("#out").innerHTML = renderTrip(t);
+    document.title = `${t.city.name} in ${t.month_name} – CityPulse`;
+    $("#trip-month").addEventListener("change", e => go({ city, cc, month: +e.target.value }));
+    document.querySelectorAll(".months button").forEach(b => b.addEventListener("click", () => go({ city, cc, month: +b.dataset.m })));
+    live.then(j => { $("#live").innerHTML = liveHTML(j); wireCompare(); })
+        .catch(() => { $("#live").innerHTML = `<p class="wait">Live conditions are unavailable right now.</p>`; });
   } catch (e) {
     const msg = /not found/i.test(e.message) ? `No city called “${esc(city)}”${cc ? ` in ${esc(cc.toUpperCase())}` : ""}. Check the spelling${cc ? " or remove the country code" : ""}.` : esc(e.message);
     $("#out").innerHTML = `<section class="empty"><p class="error">${msg}</p></section>`;
   } finally {
-    btn.disabled = false; btn.textContent = "Check city";
-    document.body.classList.remove("loading");
+    btn.disabled = false; btn.textContent = "Plan trip";
   }
 }
 
+$("#month").innerHTML = monthOptions(nextMonth());
 $("#search").addEventListener("submit", e => {
   e.preventDefault();
-  go({ city: $("#city").value.trim(), cc: $("#country").value.trim() });
+  go({ city: $("#city").value.trim(), cc: $("#country").value.trim(), month: +$("#month").value });
 });
 document.querySelectorAll(".hint button").forEach(b => b.addEventListener("click", () => {
   $("#city").value = b.dataset.c; $("#country").value = b.dataset.cc || "";
-  go({ city: b.dataset.c, cc: b.dataset.cc || "" });
+  go({ city: b.dataset.c, cc: b.dataset.cc || "", month: +$("#month").value });
 }));
 
-// the URL is the state: ?city=X[&country=YY] or ?compare=A&compare=B
+// the URL is the state: ?city=X[&country=YY][&month=M], ?where=1&month=M, or ?compare=A&compare=B
 function route() {
   const p = new URLSearchParams(location.search);
+  const m = +p.get("month");
+  const month = m >= 1 && m <= 12 ? m : nextMonth();
+  $("#month").value = month;
   const cmp = p.getAll("compare");
   if (cmp.length) return compareCities(cmp);
-  if (p.get("city")) { $("#city").value = p.get("city"); $("#country").value = p.get("country") || ""; return check(p.get("city"), p.get("country") || ""); }
+  if (p.get("where")) return showDestinations(month);
+  if (p.get("city")) {
+    $("#city").value = p.get("city"); $("#country").value = p.get("country") || "";
+    return check(p.get("city"), p.get("country") || "", month);
+  }
+  renderHome(month);
 }
 window.addEventListener("popstate", route);
 route();
