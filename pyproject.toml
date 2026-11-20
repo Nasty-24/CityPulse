@@ -1,0 +1,22 @@
+[project]
+name = "citypulse"
+version = "0.1.0"
+description = "One API call, one city, a full snapshot: weather, air quality, earthquakes, disasters, crime, currency and vaccination data from 8 free sources, normalized and cached."
+readme = "README.md"
+authors = [
+    { name = "Nasty-24", email = "briankibunja3@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "babel>=2.18.0",
+    "fastapi[standard]>=0.162.0",
+    "httpx>=0.28.1",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+citypulse = "citypulse:main"
+
+[build-system]
+requires = ["uv_build>=0.12.2,<0.13.0"]
+build-backend = "uv_build"
