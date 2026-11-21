@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 
-# never touch the real cache file during tests
+# never touch the real cache file or the network during tests
 os.environ["CITYPULSE_CACHE_DB"] = ":memory:"
+os.environ["CITYPULSE_WARM"] = "0"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from citypulse import cache  # noqa: E402

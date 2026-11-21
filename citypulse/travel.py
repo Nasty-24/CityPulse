@@ -17,8 +17,8 @@ from babel.languages import get_official_languages
 
 from .cache import cached
 from .scoring import clamp, grade, homicide_score, weighted
-from .sources import country_info, fetch_crime, fetch_vaccination
-from .upstream import client, get_json
+from .sources import country_info, fetch_vaccination
+from .upstream import client, fetch, get_json
 
 log = logging.getLogger("citypulse")
 HOUR, DAY = 3600, 86400
@@ -34,6 +34,24 @@ async def world_bank_latest(cc, indicator, source=None):
     j = await get_json(f"https://api.worldbank.org/v2/country/{cc}/indicator/{indicator}", **params)
     row = j[1][0] if len(j) > 1 and j[1] else None
     return (row["value"], row["date"]) if row else (None, None)
+
+
+# World Development Indicators used by trip reports, fetched in one request per country
+WDI = {"homicide": "VC.IHR.PSRC.P5", "water": "SH.H2O.BASW.ZS", "doctors": "SH.MED.PHYS.ZS",
+       "ppp": "PA.NUS.PPP", "fx_rate": "PA.NUS.FCRF", "arrivals": "ST.INT.ARVL"}
+
+
+async def _fetch_world_bank_bundle(cc):
+    j = await get_json(f"https://api.worldbank.org/v2/country/{cc}/indicator/{';'.join(WDI.values())}",
+                       format="json", source=2, mrnev=1, per_page=100)
+    rows = {r["indicator"]["id"]: (r["value"], r["date"]) for r in (j[1] if len(j) > 1 and j[1] else [])}
+    return {key: rows.get(code, (None, None)) for key, code in WDI.items()}
+
+
+async def world_bank_bundle(cc):
+    """{key: (value, year)} for every indicator in WDI, shared by safety, health and costs."""
+    bundle, _ = await cached(f"wdi:{cc}", 7 * DAY, lambda: _fetch_world_bank_bundle(cc))
+    return {k: tuple(v) for k, v in bundle.items()}  # JSON round-trips tuples as lists
 
 
 async def who_gho_latest(indicator, iso3, extra=""):
@@ -213,15 +231,14 @@ async def fetch_advisory(place):
 async def fetch_safety(place):
     country, _ = await country_info(place)
     cc, iso3 = place["country_code"], country["cca3"]
-    crime, road, stability = await asyncio.gather(
-        fetch_crime(place),
+    wdi, road, stability = await asyncio.gather(
+        world_bank_bundle(cc),
         who_gho_latest("RS_198", iso3, " and Dim1 eq 'SEX_BTSX'"),
         world_bank_latest(cc, "GOV_WGI_PV.EST", source=3),
         return_exceptions=True)
     out = {}
-    if not isinstance(crime, Exception) and crime.get("homicide_100k"):
-        h = crime["homicide_100k"]
-        out["homicide_100k"] = fact(h["v"], h["yr"], "World Bank (UNODC)")
+    if not isinstance(wdi, Exception):
+        out["homicide_100k"] = fact(*wdi["homicide"], "World Bank (UNODC)")
     if not isinstance(road, Exception):
         out["road_deaths_100k"] = fact(*road, "WHO Global Health Observatory")
     if not isinstance(stability, Exception):
@@ -263,10 +280,9 @@ async def fetch_outbreaks(place):
 async def fetch_health(place):
     country, _ = await country_info(place)
     cc, iso3 = place["country_code"], country["cca3"]
-    malaria, water, doctors, vaccines = await asyncio.gather(
+    malaria, wdi, vaccines = await asyncio.gather(
         who_gho_latest("MALARIA_EST_INCIDENCE", iso3),
-        world_bank_latest(cc, "SH.H2O.BASW.ZS"),
-        world_bank_latest(cc, "SH.MED.PHYS.ZS"),
+        world_bank_bundle(cc),
         fetch_vaccination(place),
         return_exceptions=True)
     out = {}
@@ -274,10 +290,9 @@ async def fetch_health(place):
         # WHO reports nothing for countries without local transmission
         out["malaria_per_1000"] = fact(*malaria, "WHO Global Health Observatory") or \
             {"v": 0, "yr": None, "source": "WHO (no local transmission reported)"}
-    if not isinstance(water, Exception):
-        out["basic_water_pct"] = fact(*water, "World Bank (WHO/UNICEF JMP)")
-    if not isinstance(doctors, Exception):
-        out["physicians_per_1000"] = fact(*doctors, "World Bank (WHO)")
+    if not isinstance(wdi, Exception):
+        out["basic_water_pct"] = fact(*wdi["water"], "World Bank (WHO/UNICEF JMP)")
+        out["physicians_per_1000"] = fact(*wdi["doctors"], "World Bank (WHO)")
     if not isinstance(vaccines, Exception):
         out["vaccines"] = vaccines
     return out
@@ -293,9 +308,8 @@ async def fetch_hazards(place):
     """GDACS (UN/EU) disaster alerts for the country over the last 90 days."""
     today = datetime.now(timezone.utc).date()
     for name in country_names(place):
-        r = await client.get("https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH",
-                             params={"country": name, "fromdate": str(today - timedelta(days=90)),
-                                     "todate": str(today)})
+        r = await fetch("https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH",
+                        country=name, fromdate=str(today - timedelta(days=90)), todate=str(today))
         if r.status_code == 204 or not r.content:
             continue
         r.raise_for_status()
@@ -317,10 +331,8 @@ async def fetch_hazards(place):
 # ---------------------------------------------------------------- money and practical
 
 async def fetch_costs(place):
-    cc = place["country_code"]
-    (ppp, year), (rate, _), (arrivals, arr_year) = await asyncio.gather(
-        world_bank_latest(cc, "PA.NUS.PPP"), world_bank_latest(cc, "PA.NUS.FCRF"),
-        world_bank_latest(cc, "ST.INT.ARVL"))
+    wdi = await world_bank_bundle(place["country_code"])
+    (ppp, year), (rate, _), (arrivals, arr_year) = wdi["ppp"], wdi["fx_rate"], wdi["arrivals"]
     out = {}
     if ppp and rate:
         level = ppp / rate  # what a dollar of US prices costs locally; below 1 means cheaper than the US
@@ -334,7 +346,7 @@ async def fetch_costs(place):
 
 
 async def fetch_holidays(cc, year):
-    r = await client.get(f"https://date.nager.at/api/v3/PublicHolidays/{year}/{cc}")
+    r = await fetch(f"https://date.nager.at/api/v3/PublicHolidays/{year}/{cc}")
     if r.status_code in (204, 404) or not r.content:
         return None  # country not covered by Nager.Date
     r.raise_for_status()
@@ -365,6 +377,8 @@ SECTIONS = {
 }
 TRIP_WEIGHTS = {"climate": 40, "safety": 30, "health": 18, "hazards": 12}
 CLIMATE_CAP = 45  # a holiday can't rate much better than its weather: score <= climate + 45
+POOR_WEATHER = 50       # below this weather score (e.g. 43 C heat, monsoon) ...
+POOR_WEATHER_MAX = 64   # ... the best possible verdict is "Go with care"
 TRIP_GRADES = [(80, "Great time to go"), (65, "Good time to go"), (50, "Go with care"), (0, "Think twice")]
 
 
@@ -435,7 +449,10 @@ def trip_score(month, s):
     if score is None:
         return None
     if "climate" in parts:
-        score = min(score, round(parts["climate"]) + CLIMATE_CAP)
+        climate = round(parts["climate"])
+        score = min(score, climate + CLIMATE_CAP)
+        if climate < POOR_WEATHER:
+            score = min(score, POOR_WEATHER_MAX)
     return {"score": score, "grade": next(g for lo, g in TRIP_GRADES if score >= lo),
             "parts": {k: round(v) for k, v in parts.items()},
             "based_on": f"{len(parts)} of {len(TRIP_WEIGHTS)} areas"}
@@ -492,15 +509,18 @@ def best_months(climate, top=3):
     return [{"month": m, "name": calendar.month_name[m], "climate_score": sc} for sc, m in scored]
 
 
-async def trip_report(place, month):
-    s = await load_sections(place)
-    year = date.today().year if month >= date.today().month else date.today().year + 1
+async def _holidays(cc, year):
     try:
-        holidays, _ = await cached(f"holidays:{place['country_code']}:{year}", 30 * DAY,
-                                   lambda: fetch_holidays(place["country_code"], year))
+        holidays, _ = await cached(f"holidays:{cc}:{year}", 30 * DAY, lambda: fetch_holidays(cc, year))
+        return holidays
     except Exception as e:
-        log.warning("holidays failed for %s: %r", place["country_code"], e)
-        holidays = None
+        log.warning("holidays failed for %s: %r", cc, e)
+        return None
+
+
+async def trip_report(place, month):
+    year = date.today().year if month >= date.today().month else date.today().year + 1
+    s, holidays = await asyncio.gather(load_sections(place), _holidays(place["country_code"], year))
     in_month = [h for h in (holidays or []) if int(h["date"][5:7]) == month]
     climate = s.get("climate")
     normals = (climate or {}).get("months") or []

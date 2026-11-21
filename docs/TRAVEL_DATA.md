@@ -107,5 +107,6 @@ Two rules keep the score honest:
 
 - An official "avoid travel to the whole country" warning caps safety at 35, so it can't be averaged away.
 - A trip can't score more than 45 points above its climate score, so a freezing or monsoon month can't look great just because the country is safe.
+- If a month's climate score is below 50 (for example 43 °C heat or a month of daily rain), the best possible verdict is "Go with care".
 
 Cost is shown but not scored: cheap is good for some travellers and a warning sign for others.

@@ -359,7 +359,7 @@ function tripScoreBlock(t) {
     <div class="g ${t.score >= 65 ? "good" : t.score >= 50 ? "fair" : "poor"}">${esc(t.grade)}</div>
     <details><summary>How this is scored</summary>
       <table>${rows}</table>
-      <p>Weather 40%, safety 30%, health 18%, hazards 12%. Official "avoid all travel" warnings and bad weather cap the score. Based on ${esc(t.based_on)}.</p>
+      <p>Weather 40%, safety 30%, health 18%, hazards 12%. Official "avoid all travel" warnings and poor weather cap the score: a month with poor weather is at best "Go with care". Based on ${esc(t.based_on)}.</p>
     </details>
   </div>`;
 }
@@ -570,7 +570,7 @@ function go(state) {
 async function compareCities(list) {
   const btn = $("#go");
   btn.disabled = true;
-  $("#out").innerHTML = `<section class="cmp-head"><h1>Comparing ${list.map(esc).join(" and ")}…</h1></section>`;
+  $("#out").innerHTML = `<section class="cmp-head"><h1>Comparing ${list.map(c => esc(c.split(",")[0])).join(" and ")}…</h1></section>`;
   try {
     const res = await fetch(`/compare?${list.map(c => "city=" + encodeURIComponent(c)).join("&")}`);
     const j = await res.json();

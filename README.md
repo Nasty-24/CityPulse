@@ -31,6 +31,7 @@ One 0 to 100 number for a city in a given month: weather 40%, safety 30%, health
 
 - An official warning against travel to the whole country caps safety at 35, so it can't be averaged away.
 - A trip can't score more than 45 points above its weather score, so a freezing or monsoon month can't look great just because the country is safe.
+- A month with poor weather (weather score below 50, such as 43 °C heat or daily rain) can at best be rated "Go with care".
 - Cost is shown but not scored.
 
 Full weights and thresholds: [docs/TRAVEL_DATA.md](docs/TRAVEL_DATA.md#how-the-trip-score-uses-this).
@@ -75,7 +76,7 @@ curl localhost:8000/city/Tokyo
 
 Dashboard: http://localhost:8000 | Interactive API docs: http://localhost:8000/docs
 
-The first `/destinations` call after a start collects safety and health data for 30 countries and takes a minute or two; after that it is cached and fast.
+On startup the server researches next month's 30 destinations in the background, so the dashboard's first ranking is ready when visitors arrive. That first run collects safety and health data for 30 countries and takes a minute or more depending on the network; results are kept in `cache.db`, so restarts are mostly cache hits. Set `CITYPULSE_WARM=0` to turn the warm-up off.
 
 ### With Docker
 
@@ -287,8 +288,10 @@ Sources that need country facts (like `fx`) call `country_info(place)`, which re
 
 ## HTTP client notes
 
-- `httpx.AsyncClient` with a 15 s total and 10 s connect timeout, closed cleanly on shutdown
-- `AsyncHTTPTransport(retries=2, local_address="0.0.0.0")` retries connection failures and forces IPv4
+- `httpx.AsyncClient` with a 20 s total and 10 s connect timeout, closed cleanly on shutdown
+- Every request goes through `upstream.fetch`: at most 6 requests run against one host at a time, and dropped connections, timeouts and 429/5xx responses are retried twice with backoff. Free APIs drop connections under load, and without this some destinations silently lost data.
+- World Bank indicators for a country are fetched in one combined request and shared by the safety, health and cost sections
+- `local_address="0.0.0.0"` forces IPv4
 - Send an honest `User-Agent` (set in `citypulse/upstream.py`). Several providers rate limit or block anonymous or spoofed agents.
 - A custom transport makes httpx ignore proxy environment variables. If you are behind a proxy, pass `proxy=os.environ.get("HTTPS_PROXY")` to the transport.
 - Errors shown to callers are short and generic (`source timed out`, `source returned HTTP 503`, ...). Full details, including upstream URLs, go to the server log only.

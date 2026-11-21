@@ -111,3 +111,23 @@ def test_cold_wet_month_mentions_snow():
 
 def test_languages():
     assert travel.languages("KE") == ["Swahili", "English"]
+
+
+def test_world_bank_bundle_is_one_request(monkeypatch):
+    calls = []
+
+    async def fake_get_json(url, **params):
+        calls.append(url)
+        return [{"page": 1}, [
+            {"indicator": {"id": "PA.NUS.PPP"}, "value": 43.5, "date": "2025"},
+            {"indicator": {"id": "PA.NUS.FCRF"}, "value": 129.3, "date": "2025"},
+            {"indicator": {"id": "SH.H2O.BASW.ZS"}, "value": 65.6, "date": "2024"},
+        ]]
+
+    monkeypatch.setattr(travel, "get_json", fake_get_json)
+    costs = run(travel.fetch_costs(NAIROBI))
+    bundle = run(travel.world_bank_bundle("KE"))  # second use comes from the cache
+    assert len(calls) == 1 and ";" in calls[0]
+    assert costs["price_level"]["label"] == "Very cheap" and costs["price_level"]["v"] == 0.34
+    assert "tourist_arrivals" not in costs                       # missing indicator -> left out
+    assert bundle["water"] == (65.6, "2024") and bundle["homicide"] == (None, None)

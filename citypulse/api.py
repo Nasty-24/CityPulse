@@ -3,6 +3,7 @@
 import asyncio
 import calendar
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 
@@ -20,9 +21,24 @@ from .upstream import client
 log = logging.getLogger("citypulse")
 
 
+async def warm_destinations():
+    """Fill the cache for next month's ranking so the first visitor doesn't wait.
+    Values persist in SQLite, so after a restart this is mostly cache hits."""
+    try:
+        await destinations(month=default_month(), city=None, limit=30)
+        log.info("destination cache warmed")
+    except Exception as e:  # never let warming break the app
+        log.warning("warming destinations failed: %r", e)
+
+
 @asynccontextmanager
 async def lifespan(_app):
+    warm = None
+    if os.environ.get("CITYPULSE_WARM", "1") != "0":
+        warm = asyncio.create_task(warm_destinations())
     yield
+    if warm and not warm.done():
+        warm.cancel()
     await client.aclose()
     store.close()
 
@@ -178,8 +194,9 @@ async def trip(
     return {"city": place_summary(place), **report}
 
 
-# limits how many destinations are researched at once, to stay polite to the free APIs
-DESTINATION_CONCURRENCY = asyncio.Semaphore(4)
+# limits how many destinations are researched at once, to stay polite to the free APIs.
+# Climate for the built-in list is bundled, so this does not touch the rate-limited archive.
+DESTINATION_CONCURRENCY = asyncio.Semaphore(10)
 
 
 @app.get("/destinations")

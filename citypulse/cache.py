@@ -26,6 +26,9 @@ class Cache:
     def __init__(self, path: str = DEFAULT_PATH, memory_items: int = MEMORY_ITEMS):
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.execute("pragma journal_mode=wal")
+        # with WAL this stays crash-safe; a power cut can only lose the newest few writes, which for a
+        # cache just means refetching. Full sync made every write wait on the disk (~170 ms each).
+        self.db.execute("pragma synchronous=normal")
         self.db.execute("create table if not exists c(k text primary key, exp real, val text)")
         self.db.execute("delete from c where exp < ?", (time.time() - KEEP_EXPIRED_FOR,))
         self.db.commit()

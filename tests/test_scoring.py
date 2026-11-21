@@ -87,6 +87,12 @@ def test_bad_weather_caps_trip_score():
     assert t["grade"] in ("Go with care", "Think twice")
 
 
+def test_scorching_month_is_never_good_even_in_a_safe_country():
+    t = trip_score(7, sections(high=43))   # Dubai in July: dry, sunny, 43 C
+    assert t["parts"]["climate"] < 50 and t["parts"]["safety"] > 90
+    assert t["grade"] == "Go with care"
+
+
 def test_trip_score_great_month():
     t = trip_score(7, sections(high=26))
     assert t["score"] >= 90 and t["grade"] == "Great time to go"
